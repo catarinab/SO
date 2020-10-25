@@ -5,7 +5,6 @@
  * 94179 Luis Freire D'Andrade
 */
 
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <getopt.h>
