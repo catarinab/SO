@@ -1,0 +1,86 @@
+# 30 creates, 50 lookups, 5 deletes
+c drapery f
+c ergal f
+c cypseline f
+c telfer f
+c saccharimetrical f
+c reluctantly f
+c Cephalophus f
+c busted f
+c dalle f
+c hydrant f
+c Ceramium f
+c coheritage f
+c Paulinist f
+c heterolysin f
+c mesiogingival f
+c Amalfitan f
+c unwaggable f
+c Lif f
+c s1/ d
+c s1/s2 d
+c s1/s3 d
+c s1/s2/s4 f
+c s1/s2/s5 f
+c benumb f
+c Dungan f
+c grapelet f
+c therology f
+c autophotometry f
+c nonarcing f
+c expiry f
+l coheritage
+l expiry
+l coheritage
+l aphonic
+l benumb
+l judgmatic
+l trilingual
+l dummyweed
+l denaturization
+l suppleness
+l tenontography
+l autophotometry
+l busted
+l outbawl
+l mesiogingival
+l kentledge
+l palpiform
+l autophotometry
+l laterocaudal
+l unreined
+l heterolysin
+l grapelet
+l benumb
+l tubercularize
+l gaslighting
+l coheritage
+l expiry
+l coheritage
+l aphonic
+l benumb
+l judgmatic
+l trilingual
+l dummyweed
+l denaturization
+l suppleness
+l tenontography
+l autophotometry
+l busted
+l outbawl
+l mesiogingival
+l kentledge
+l palpiform
+l autophotometry
+l laterocaudal
+l unreined
+l heterolysin
+l grapelet
+l benumb
+l tubercularize
+l gaslighting
+d busted
+d Amalfitan
+d hydrant
+d Cephalophus
+d heterolysin

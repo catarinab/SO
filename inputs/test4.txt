@@ -1,0 +1,17 @@
+# 8 creates, 4 lookups, 2 deletes
+c fruits d
+c fruits/apple f 
+c fruits/orange f 
+c fruits/banana f 
+c fruits/grape f 
+# error: create again
+c fruits d
+l fruits/apple
+c animals f
+# error: animals is a file
+c animals/cat f
+l animals/cat
+d fruits/grape
+d fruits/grape
+l fruits/grape
+l fruits
