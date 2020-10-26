@@ -81,7 +81,6 @@ int insertCommand(char* data) {
 int getNumberCommands() {
     lock(COMMANDS);
     int nCommands = numberCommands;
-    unlock(COMMANDS);
     return nCommands;
 }
 
@@ -168,6 +167,7 @@ void processInput() {
  */
 void * applyCommands(void * ptr) {
     while (getNumberCommands() > 0) {
+        unlock(COMMANDS);
         const char* command = removeCommand();
         if (command == NULL) {
             continue;
