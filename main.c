@@ -81,6 +81,9 @@ int insertCommand(char* data) {
 int getNumberCommands() {
     lock(COMMANDS);
     int nCommands = numberCommands;
+    /*FALAR DISTO COM O LUIS!! DA ERRO QUANDO PASSAMOS O UNLOCK PARA BAIXO
+    MAS TAMBEM PROVAVELMENTE NÃO VAMOS TER DE USAR ESTE LOCK*/
+    unlock(COMMANDS);
     return nCommands;
 }
 
@@ -167,7 +170,6 @@ void processInput() {
  */
 void * applyCommands(void * ptr) {
     while (getNumberCommands() > 0) {
-        unlock(COMMANDS);
         const char* command = removeCommand();
         if (command == NULL) {
             continue;

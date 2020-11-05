@@ -50,20 +50,20 @@ void destroyLocks() {
     if(synchstrategy != NOSYNC) {
         /* Commands lock. */
         if (pthread_mutex_destroy(&mutexCommands)!= 0) {
-            fprintf(stderr, "Error: mutex lock destruction failed\n");
+            fprintf(stderr, "1111 Error: mutex lock destruction failed\n");
             exit(EXIT_FAILURE);  
         }
 
         /* FS lock. */
         if (synchstrategy == MUTEX) {
             if (pthread_mutex_destroy(&mutexLock) != 0) {
-                fprintf(stderr, "Error: mutex lock destruction failed\n");
+                fprintf(stderr, "2222 Error: mutex lock destruction failed\n");
                 exit(EXIT_FAILURE);  
             }
         }
         else if (synchstrategy == RWLOCK) {
             if (pthread_rwlock_destroy(&rwLock) != 0) {
-                fprintf(stderr, "Error: readwrite lock destruction failed\n");
+                fprintf(stderr, "3333 Error: readwrite lock destruction failed\n");
                 exit(EXIT_FAILURE);
             }
         }
