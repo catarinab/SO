@@ -3,6 +3,18 @@ inputDir=$1
 outputDir=$2
 maxThreads=$3
 
+[ ! -d ${inputDir} ] && echo "A pasta de entrada ${inputDir} não existe." && exit
+
+[ ! -d ${outputDir} ] && echo "A pasta de saída ${outputDir} não existe." && exit
+
+if [[ ${maxThreads} =~ ^[\-0-9]+$ ]] && (( ${maxThreads} > 0)); then
+    true
+else
+  echo "O valor de maxThreads não é um número ou é <= 0."
+  echo "Repita a chamada ao script com um valor correcto de MaxThreads."
+  exit
+fi
+
 for inputFile in $(ls ${inputDir})
 do
     for num in $(seq 1 ${maxThreads})
