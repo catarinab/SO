@@ -11,136 +11,30 @@
 #include <string.h>
 #include <pthread.h>
 
-/* Lock for variables associated with the commands. */
-pthread_mutex_t mutexCommands;
-/* Locks for the FS (depending on the synch strategy chosen). */
-pthread_mutex_t mutexLock;
-pthread_rwlock_t rwLock;
-
-/* Initializes all the locks needed.
- */
-void initLocks() {
-    if (synchstrategy != NOSYNC) {
-        /* Commands lock. */
-        if (pthread_mutex_init(&mutexCommands, NULL) != 0) {
-            fprintf(stderr, "Error: mutex lock initialization failed\n");
-            exit(EXIT_FAILURE);
-        }
-
-        /* FS lock. */
-        if(synchstrategy == MUTEX) {
-            if (pthread_mutex_init(&mutexLock, NULL) != 0) {
-                fprintf(stderr, "Error: mutex lock initialization failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        else if(synchstrategy == RWLOCK) {
-            if (pthread_rwlock_init(&rwLock, NULL) != 0) {
-                fprintf(stderr, "Error: lock initialization failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
-    /* nosync doesnt do anything. */
-}
-
-/* Destroys all the locks created.
- */
-void destroyLocks() { 
-    if(synchstrategy != NOSYNC) {
-        /* Commands lock. */
-        if (pthread_mutex_destroy(&mutexCommands)!= 0) {
-            fprintf(stderr, "1111 Error: mutex lock destruction failed\n");
-            exit(EXIT_FAILURE);  
-        }
-
-        /* FS lock. */
-        if (synchstrategy == MUTEX) {
-            if (pthread_mutex_destroy(&mutexLock) != 0) {
-                fprintf(stderr, "2222 Error: mutex lock destruction failed\n");
-                exit(EXIT_FAILURE);  
-            }
-        }
-        else if (synchstrategy == RWLOCK) {
-            if (pthread_rwlock_destroy(&rwLock) != 0) {
-                fprintf(stderr, "3333 Error: readwrite lock destruction failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
-    /* nosync doesnt do anything. */
-}
-
-/* Given a flag, locks the respective lock.
+/* Given a structure of locked inodes' inumbers, adds another inumber.
  * Input:
- *  - flag: the flag that indicates which lock to lock (flag descriptions in 
- * operations.h). 
+ *  - locked_inodes: the structure with the inumbers.
+ *  - inumber: the inumber to add.
  */
-void lock(int flag) {
-    if (synchstrategy != NOSYNC) {
-        /* Commands lock. */
-        if (flag == COMMANDS) {
-            if (pthread_mutex_lock(&mutexCommands) != 0) {
-                fprintf(stderr, "Error: mutex lock failed\n");
-                exit(EXIT_FAILURE);  
-            }
-        }
-        
-        /* FS lock. */
-        else if (synchstrategy == MUTEX) {
-            if (pthread_mutex_lock(&mutexLock) != 0) {
-                fprintf(stderr, "Error: mutex lock failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        else if (synchstrategy == RWLOCK) {
-            if (flag == READ) {
-                if (pthread_rwlock_rdlock(&rwLock) != 0) {
-                    fprintf(stderr, "Error: readwrite lock failed\n");
-                    exit(EXIT_FAILURE);
-                }
-            }
-            else if (flag == WRITE) {
-                if( pthread_rwlock_wrlock(&rwLock) != 0) {
-                    fprintf(stderr, "Error: readwrite lock failed\n");
-                    exit(EXIT_FAILURE);
-                }
-            }
-        }
-    }
-    /* nosync doesnt do anything. */
+void addLockedInode(LockedInodes * locked_inodes, int inumber){
+	printf("Adicionar locked inumber: %d\n", inumber);
+	locked_inodes->inumbers = (int *) realloc(locked_inodes->inumbers, (locked_inodes->size + 1) * sizeof(int));
+	locked_inodes->inumbers[locked_inodes->size] = inumber;
+	locked_inodes->size += 1;
 }
 
-/* Given a flag, unlocks the respective lock.
+/* Given a structure of locked inodes' inumbers, unlocks every inode.
  * Input:
- *  - flag: the flag that indicates which lock to unlock (flag descriptions in 
- * operations.h).
+ *  - locked_inodes: the structure with the inumbers.
  */
-void unlock(int flag) {
-    if(synchstrategy != NOSYNC) {
-        /* Commands lock. */
-        if (flag == COMMANDS) {
-            if (pthread_mutex_unlock(&mutexCommands) != 0) {
-                fprintf(stderr, "Error: mutex unlock failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        
-        /* FS lock. */
-        else if (synchstrategy == MUTEX) {
-            if (pthread_mutex_unlock(&mutexLock) != 0) {
-                fprintf(stderr, "Error: mutex unlock failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-        else if (synchstrategy == RWLOCK) {
-            if( pthread_rwlock_unlock(&rwLock) != 0) {
-                fprintf(stderr, "Error: readwrite unlock failed\n");
-                exit(EXIT_FAILURE);
-            }
-        }
-    }
-	/* nosync doesnt do anything. */
+void unlockLockedInodes(LockedInodes * locked_inodes){
+	printf("unlockedInodes\n");
+	for(int i = 0; i < locked_inodes->size; i++) {
+		printf("unlock LockedInodes: %d\n", i);
+		unlock(locked_inodes->inumbers[i]);
+	}
+	printf("free LockedInodes->inumbers\n");
+	free(locked_inodes->inumbers);
 }
 
 /* Given a path, fills pointers with strings for the parent path and child
@@ -247,7 +141,7 @@ int lookup_sub_node(char *name, DirEntry *entries) {
 
 /* Not included in operations.h because its not supposed to be used outside this
 file, since it doesnt have any locks. */
-int lookupCommands(char *name) {
+int lookupCommands(char *name, LockedInodes *locked_inodes) {
 	char full_path[MAX_FILE_NAME];
 	char delim[] = "/";
 
@@ -261,17 +155,22 @@ int lookupCommands(char *name) {
 	union Data data;
 
 	/* get root inode data */
-	/* lock(READ); */
+	printf("1 lock no inumber: %d (lookupCommands)\n", current_inumber);
+	lock(current_inumber, READ);
+	addLockedInode(locked_inodes, current_inumber);
 	inode_get(current_inumber, &nType, &data);
 
 	char *path = strtok(full_path, delim);
 
 	/* search for all sub nodes */
 	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
+		printf("2 lock no inumber: %d (lookupCommands)\n", current_inumber);
+		lock(current_inumber, READ);
+		addLockedInode(locked_inodes, current_inumber);
 		inode_get(current_inumber, &nType, &data);
 		path = strtok(NULL, delim);
 	}
-	/* unlock(); */
+	printf("retornar inumber: %d\n", current_inumber);
 	return current_inumber;
 }
 
@@ -284,9 +183,12 @@ int lookupCommands(char *name) {
  *     FAIL: otherwise
  */
 int lookup(char *name) {
-	lock(READ);
-	int searchResult = lookupCommands(name);
-	unlock(synchstrategy);
+	LockedInodes locked_inodes;
+	locked_inodes.size = 0;
+
+	int searchResult = lookupCommands(name, &locked_inodes);
+	unlockLockedInodes(&locked_inodes);
+
 	return searchResult;
 }
 
@@ -298,58 +200,69 @@ int lookup(char *name) {
  * Returns: SUCCESS or FAIL
  */
 int create(char *name, type nodeType){
-
 	int parent_inumber, child_inumber;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
 	/* use for copy */
 	type pType;
 	union Data pdata;
+	LockedInodes locked_inodes;
+	locked_inodes.size = 0;
+
 
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	lock(WRITE);
-	parent_inumber = lookupCommands(parent_name);
+	parent_inumber = lookupCommands(parent_name, &locked_inodes);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
 		        name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
+	printf("lock no inumber: %d (create)\n", parent_inumber);
+	lock(parent_inumber, WRITE);
+	printf("successful lock no inumber: %d (create)\n", parent_inumber);
+	addLockedInode(&locked_inodes, parent_inumber);
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {
 		printf("failed to create %s, parent %s is not a dir\n",
 		        name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
 		printf("failed to create %s, already exists in dir %s\n",
 		       child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
 	/* create node and add entry to folder that contains new node */
 	child_inumber = inode_create(nodeType);
+	
+
 	if (child_inumber == FAIL) {
 		printf("failed to create %s in  %s, couldn't allocate inode\n",
 		        child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
+
+	printf("lock no inumber: %d (create)\n", child_inumber);
+	lock(child_inumber, WRITE);
+	addLockedInode(&locked_inodes, child_inumber);
 
 	if (dir_add_entry(parent_inumber, child_inumber, child_name) == FAIL) {
 		printf("could not add entry %s in dir %s\n",
 		       child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-	unlock(synchstrategy);
+	unlockLockedInodes(&locked_inodes);
 
 	return SUCCESS;
 }
@@ -361,32 +274,35 @@ int create(char *name, type nodeType){
  * Returns: SUCCESS or FAIL
  */
 int delete(char *name){
-
 	int parent_inumber, child_inumber;
 	char *parent_name, *child_name, name_copy[MAX_FILE_NAME];
 	/* use for copy */
 	type pType, cType;
 	union Data pdata, cdata;
+	LockedInodes locked_inodes;
+	locked_inodes.size = 0;
 
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	lock(WRITE);
-	parent_inumber = lookupCommands(parent_name);
+	parent_inumber = lookupCommands(parent_name, &locked_inodes);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
+	printf("lock no inumber: %d (create)\n", parent_inumber);
+	lock(parent_inumber, WRITE);
+	addLockedInode(&locked_inodes, parent_inumber);
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {
 		printf("failed to delete %s, parent %s is not a dir\n",
 		        child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
@@ -395,16 +311,19 @@ int delete(char *name){
 	if (child_inumber == FAIL) {
 		printf("could not delete %s, does not exist in dir %s\n",
 		       name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
+	printf("lock no inumber: %d (create)\n", child_inumber);
+	lock(child_inumber, WRITE);
+	addLockedInode(&locked_inodes, child_inumber);
 	inode_get(child_inumber, &cType, &cdata);
 
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {
 		printf("could not delete %s: is a directory and not empty\n",
 		       name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
@@ -412,17 +331,17 @@ int delete(char *name){
 	if (dir_reset_entry(parent_inumber, child_inumber) == FAIL) {
 		printf("failed to delete %s from dir %s\n",
 		       child_name, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
 
 	if (inode_delete(child_inumber) == FAIL) {
 		printf("could not delete inode number %d from dir %s\n",
 		       child_inumber, parent_name);
-		unlock(synchstrategy);
+		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-	unlock(synchstrategy);
+	unlockLockedInodes(&locked_inodes);
 
 	return SUCCESS;
 }

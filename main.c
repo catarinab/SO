@@ -21,7 +21,7 @@
 int numberThreads;
 FILE * inputFile;
 FILE * outputFile;
-/* synchstrategy in operations.h */
+pthread_mutex_t lockinho;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numberCommands = 0;
@@ -56,9 +56,6 @@ void processArgs(int argc, char * argv[]) {
         fprintf(stderr, "Error: invalid number of threads\n");
         exit(EXIT_FAILURE);
     }
-    
-    /* Verifies Synch Strategy. */
-    synchstrategy = RWLOCK;
 }
 
 /* Inserts a valid command in inputCommands, and returns if it was successful.
@@ -79,11 +76,9 @@ int insertCommand(char* data) {
 /* Returns number of Commands while protecting with a lock the global variable numberCommands.
  */
 int getNumberCommands() {
-    lock(COMMANDS);
+    pthread_mutex_lock(&lockinho);
     int nCommands = numberCommands;
-    /*FALAR DISTO COM O LUIS!! DA ERRO QUANDO PASSAMOS O UNLOCK PARA BAIXO
-    MAS TAMBEM PROVAVELMENTE NÃO VAMOS TER DE USAR ESTE LOCK*/
-    unlock(COMMANDS);
+    pthread_mutex_unlock(&lockinho);
     return nCommands;
 }
 
@@ -92,15 +87,15 @@ int getNumberCommands() {
  *  - The command that was removed.
  */
 char* removeCommand() {
-    lock(COMMANDS);
+    pthread_mutex_lock(&lockinho);
     if (numberCommands > 0) {
         numberCommands--;
         int head = headQueue;
         headQueue++;
-        unlock(COMMANDS);
+        pthread_mutex_unlock(&lockinho);
         return inputCommands[head];  
     }
-    unlock(COMMANDS);
+    pthread_mutex_unlock(&lockinho);
     return NULL;
 }
 
@@ -227,9 +222,6 @@ void parallelization() {
     int i;
     pthread_t tid[numberThreads];
 
-    /* Function call that initializes the locks. */
-    initLocks();
-
     /* Creation of the threads. */
     for (i = 0; i < numberThreads; i++) {
         if (pthread_create(&tid[i], NULL, applyCommands, NULL) != 0) {
@@ -245,16 +237,17 @@ void parallelization() {
             exit(EXIT_FAILURE);
         }
     }
-
-    /* Function call that destroys the locks. */
-    destroyLocks();
 }
 
 /* Main.
  */
 int main(int argc, char* argv[]) {
+    printf("mutex init\n");
     struct timeval tick, tock;
     double time;
+    printf("mutex init\n");
+    pthread_mutex_init(&lockinho, NULL);
+    printf("done\n");
 
     /* Initializes filesystem. */
     init_fs();
@@ -282,5 +275,6 @@ int main(int argc, char* argv[]) {
 
     /* Releases allocated memory. */
     destroy_fs();
+    pthread_mutex_destroy(&lockinho);
     exit(EXIT_SUCCESS);
 }

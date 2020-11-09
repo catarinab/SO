@@ -7,6 +7,49 @@
 
 inode_t inode_table[INODE_TABLE_SIZE];
 
+/* Given a flag, locks the respective lock.
+ * Input:
+ *  - inumber: the number of the inode that is going to be locked.
+ *  - flag: the flag that indicates which lock to lock (flag descriptions in 
+ * operations.h). 
+ */
+void lock(int inumber, int flag) {
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
+        printf("lock: invalid inumber\n");
+        exit(EXIT_FAILURE);
+    }
+
+	if (flag == READ) {
+		if (pthread_rwlock_rdlock(&inode_table[inumber].lock) != 0) {
+			fprintf(stderr, "Error: readwrite lock failed\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if (flag == WRITE) {
+		if( pthread_rwlock_wrlock(&inode_table[inumber].lock) != 0) {
+			fprintf(stderr, "Error: readwrite lock failed\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
+/* Given a flag, unlocks the respective lock.
+ * Input:
+ *  - inumber: the number of the inode that is going to be locked.
+ *  - flag: the flag that indicates which lock to unlock (flag descriptions in 
+ * operations.h).
+ */
+void unlock(int inumber) {
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
+        printf("lock: invalid inumber\n");
+        exit(EXIT_FAILURE);
+    }
+
+	if (pthread_rwlock_unlock(&inode_table[inumber].lock) != 0) {
+		fprintf(stderr, "Error: readwrite unlock failed\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 /*
  * Sleeps for synchronization testing.
@@ -30,14 +73,18 @@ void inode_table_init() {
 /*
  * Releases the allocated memory for the i-nodes tables.
  */
-
 void inode_table_destroy() {
     for (int i = 0; i < INODE_TABLE_SIZE; i++) {
         if (inode_table[i].nodeType != T_NONE) {
             /* as data is an union, the same pointer is used for both dirEntries and fileContents */
             /* just release one of them */
-	  if (inode_table[i].data.dirEntries)
-            free(inode_table[i].data.dirEntries);
+	        if (inode_table[i].data.dirEntries) {
+                free(inode_table[i].data.dirEntries);
+            }
+            if (pthread_rwlock_destroy(&inode_table[i].lock) != 0) {
+                fprintf(stderr, "Error: readwrite lock destruction failed\n");
+                exit(EXIT_FAILURE);
+            }       
         }
     }
 }
@@ -69,6 +116,12 @@ int inode_create(type nType) {
             else {
                 inode_table[inumber].data.fileContents = NULL;
             }
+
+            if (pthread_rwlock_init(&inode_table[inumber].lock, NULL) != 0) {
+                fprintf(stderr, "Error: lock initialization failed\n");
+                exit(EXIT_FAILURE);
+            }
+
             return inumber;
         }
     }
@@ -94,6 +147,12 @@ int inode_delete(int inumber) {
     /* see inode_table_destroy function */
     if (inode_table[inumber].data.dirEntries)
         free(inode_table[inumber].data.dirEntries);
+
+    if (pthread_rwlock_destroy(&inode_table[inumber].lock) != 0) {
+        fprintf(stderr, "Error: readwrite lock destruction failed\n");
+        exit(EXIT_FAILURE);
+    }
+    
     return SUCCESS;
 }
 
