@@ -14,17 +14,23 @@
 #include <sys/time.h>
 #include "fs/operations.h"
 
-#define MAX_COMMANDS 150000
+#define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
 
 /* Variables that store the arguments from the server call. */
 int numberThreads;
 FILE * inputFile;
 FILE * outputFile;
-pthread_mutex_t lockinho;
+
+pthread_mutex_t lock_numCommands;
+pthread_mutex_t lock_consumeIndex;
+
+pthread_cond_t consume, produce;
 
 char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int numberCommands = 0;
+int numCommands;
+int produceIndex = 0;
+int consumeIndex = 0;
 int headQueue = 0;
 
 /* Processes the arguments from server call.
@@ -66,19 +72,19 @@ void processArgs(int argc, char * argv[]) {
  */
 int insertCommand(char* data) {
     /* Shared variables dont need protection since threads will not be involved. */
-    if(numberCommands != MAX_COMMANDS) {
-        strcpy(inputCommands[numberCommands++], data);
-        return 1;
-    }
-    return 0;
+    pthread_mutex_lock(&lock_numCommands);
+    produceIndex = (produceIndex + 1) % 10;
+    strcpy(inputCommands[produceIndex], data);
+    numCommands++;
+    pthread_mutex_lock(&lock_numCommands);
+    return 1;
 }
 
 /* Returns number of Commands while protecting with a lock the global variable numberCommands.
  */
 int getNumberCommands() {
-    pthread_mutex_lock(&lockinho);
-    int nCommands = numberCommands;
-    pthread_mutex_unlock(&lockinho);
+    pthread_mutex_lock(&lock_numCommands);
+    int nCommands = numCommands;
     return nCommands;
 }
 
@@ -87,15 +93,15 @@ int getNumberCommands() {
  *  - The command that was removed.
  */
 char* removeCommand() {
-    pthread_mutex_lock(&lockinho);
+    pthread_mutex_lock(&lock_numCommands);
     if (numberCommands > 0) {
         numberCommands--;
         int head = headQueue;
         headQueue++;
-        pthread_mutex_unlock(&lockinho);
+        pthread_mutex_unlock(&lock_numCommands);
         return inputCommands[head];  
     }
-    pthread_mutex_unlock(&lockinho);
+    pthread_mutex_unlock(&lock_numCommands);
     return NULL;
 }
 
@@ -115,6 +121,11 @@ void processInput() {
 
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
+        while(getNumberCommands() > 9) {
+            pthread_mutex_unlock(&lock_produceIndex);
+            wait(produce, lock_commands);
+        }
+        
         char token, type;
         char name[MAX_INPUT_SIZE];
 
@@ -153,7 +164,19 @@ void processInput() {
                 errorParse();
             }
         }
+
+        signal(consume);
+        pthread_mutex_unlock(&lock_commands);
     }
+
+    while(getNumberCommands() > 9) {
+        pthread_mutex_unlock(&lock_produceIndex);
+        wait(produce, lock_commands);
+    }
+    insertCommand("bye");
+    signal(consume);
+    pthread_mutex_unlock(&lock_commands);
+
     fclose(inputFile);
 }
 
@@ -222,6 +245,11 @@ void parallelization() {
     int i;
     pthread_t tid[numberThreads];
 
+    pthread_mutex_init(&lock_numCommands, NULL);
+    pthread_mutex_init(&lock_consumeIndex, NULL);
+    pthread_cond_init(&consume, NULL);
+    pthread_cond_init(&produce, NULL);
+
     /* Creation of the threads. */
     for (i = 0; i < numberThreads; i++) {
         if (pthread_create(&tid[i], NULL, applyCommands, NULL) != 0) {
@@ -230,6 +258,9 @@ void parallelization() {
         }
     }
 
+    /* Processes input. */
+    processInput();
+    
     /* Waits for the threads to finish. */
     for (i = 0; i < numberThreads; i++) {
         if (pthread_join(tid[i], NULL) != 0) {
@@ -237,26 +268,24 @@ void parallelization() {
             exit(EXIT_FAILURE);
         }
     }
+    
+    pthread_mutex_destroy(&lock_numCommands);
+    pthread_mutex_destroy(&lock_consumeIndex);
+    pthread_cond_destroy(&consume);
+    pthread_cond_destroy(&produce);
 }
 
 /* Main.
  */
 int main(int argc, char* argv[]) {
-    printf("mutex init\n");
     struct timeval tick, tock;
     double time;
-    printf("mutex init\n");
-    pthread_mutex_init(&lockinho, NULL);
-    printf("done\n");
 
     /* Initializes filesystem. */
     init_fs();
 
     /* Processes argurments from server call. */
     processArgs(argc, argv);
-
-    /* Processes input. */
-    processInput();
 
     /* Starts counting the time. */
     gettimeofday(&tick, NULL);
@@ -275,6 +304,5 @@ int main(int argc, char* argv[]) {
 
     /* Releases allocated memory. */
     destroy_fs();
-    pthread_mutex_destroy(&lockinho);
     exit(EXIT_SUCCESS);
 }

@@ -222,7 +222,7 @@ int create(char *name, type nodeType){
 	}
 
 	printf("lock no inumber: %d (create)\n", parent_inumber);
-	lock(parent_inumber, WRITE);
+	trylock(parent_inumber, WRITE);
 	printf("successful lock no inumber: %d (create)\n", parent_inumber);
 	addLockedInode(&locked_inodes, parent_inumber);
 	inode_get(parent_inumber, &pType, &pdata);
