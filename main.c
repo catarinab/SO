@@ -74,20 +74,27 @@ void processArgs(int argc, char * argv[]) {
 int insertCommand(char* data) {
     /* Shared variables dont need protection since threads will not be involved. */
     pthread_mutex_lock(&lock_numCommands);
+    printf("lock no numCommands 1\n");
     produceIndex = (produceIndex + 1) % 10;
     strcpy(inputCommands[produceIndex], data);
     numCommands++;
-    pthread_mutex_lock(&lock_numCommands);
+    pthread_mutex_unlock(&lock_numCommands);
+    printf("unlock no numCommands 1\n");
     return 1;
 }
 
 /* Returns number of Commands while protecting with a lock the global variable numberCommands.
  */
 int getNumberCommands() {
+    printf("chegou ao number commands\n");
     pthread_mutex_lock(&lock_numCommands);
+    printf("lock no numCommands 2\n");
+    printf("deu lock\n");
     int nCommands = numCommands;
+    printf("saiu do number commands\n");
     return nCommands;
 }
+ 
 
 /* Removes a command from inputCommands.
  * Returns:
@@ -95,14 +102,17 @@ int getNumberCommands() {
  */
 char* removeCommand() {
     pthread_mutex_lock(&lock_numCommands);
+    printf("lock no numCommands 3\n");
     if (numCommands > 0) {
         numCommands--;
         int head = headQueue;
         headQueue++;
         pthread_mutex_unlock(&lock_numCommands);
+        printf("unlock no numCommands 3\n");
         return inputCommands[head];  
     }
     pthread_mutex_unlock(&lock_numCommands);
+    printf("unlock no numCommands 3\n");
     return NULL;
 }
 
@@ -122,10 +132,16 @@ void processInput() {
 
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
+        printf("NUMCOMMANDS: %d\n", getNumberCommands());
+        pthread_mutex_unlock(&lock_numCommands);
         while(getNumberCommands() > 9) {
+            printf("entrou no while\n");
             pthread_mutex_unlock(&lock_numCommands);
+            printf("unlock no numCommands 2 dentro\n");
             pthread_cond_wait(&produce, &lock_commands);
         }
+        pthread_mutex_unlock(&lock_numCommands);
+        printf("unlock no numCommands 2\n");
         
         char token, type;
         char name[MAX_INPUT_SIZE];
@@ -166,12 +182,14 @@ void processInput() {
             }
         }
 
+
         pthread_cond_signal(&consume);
         pthread_mutex_unlock(&lock_commands);
     }
 
     while(getNumberCommands() > 9) {
         pthread_mutex_unlock(&lock_numCommands);
+        printf("lock no numCommands 2\n");
         pthread_cond_wait(&produce, &lock_commands);
     }
     insertCommand("bye");
@@ -188,7 +206,14 @@ void processInput() {
  *  - Pointer to results (needed because this function is used by threads).
  */
 void * applyCommands(void * ptr) {
+    while(getNumberCommands() < 0) {
+            printf("entrou no while\n");
+            pthread_mutex_unlock(&lock_numCommands);
+            printf("unlock no numCommands 2 dentro\n");
+            pthread_cond_wait(&consume, &lock_commands);
+        }
     while (getNumberCommands() > 0) {
+        pthread_mutex_unlock(&lock_numCommands);
         const char* command = removeCommand();
         if (command == NULL) {
             continue;
@@ -243,33 +268,35 @@ void * applyCommands(void * ptr) {
  * to join and destroys the locks.
  */
 void parallelization() {
-    int i;
-    pthread_t tid[numberThreads];
+    /*int i;
+    pthread_t tid[numberThreads];*/
 
+    printf("inicializacoes dos locks\n");
     pthread_mutex_init(&lock_commands, NULL);
     pthread_mutex_init(&lock_numCommands, NULL);
     pthread_mutex_init(&lock_consumeIndex, NULL);
     pthread_cond_init(&consume, NULL);
     pthread_cond_init(&produce, NULL);
 
-    /* Creation of the threads. */
-    for (i = 0; i < numberThreads; i++) {
+
+    /* Processes input. */
+    processInput();
+    
+    /*for (i = 0; i < numberThreads; i++) {
         if (pthread_create(&tid[i], NULL, applyCommands, NULL) != 0) {
             fprintf(stderr, "Error: couldnt create thread\n");
             exit(EXIT_FAILURE);
         }
     }
 
-    /* Processes input. */
-    processInput();
     
-    /* Waits for the threads to finish. */
+    
     for (i = 0; i < numberThreads; i++) {
         if (pthread_join(tid[i], NULL) != 0) {
             fprintf(stderr, "Error: couldnt join threads\n");
             exit(EXIT_FAILURE);
         }
-    }
+    }*/
     
     pthread_mutex_destroy(&lock_commands);
     pthread_mutex_destroy(&lock_numCommands);

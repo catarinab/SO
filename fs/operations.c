@@ -157,11 +157,13 @@ int lookupAux(char *name, LockedInodes *locked_inodes, int flag) {
 	char *path = strtok(full_path, delim);
 	
 	if (path == NULL && flag == MODIFY) {
+		printf("Lock WRITE no Inode: %d\n", current_inumber);
 		lock(current_inumber, WRITE);
+		addLockedInode(locked_inodes, current_inumber);
 	}
 	else {
 		/* get root inode data */
-		printf("1 lock no inumber: %d (lookupAux)\n", current_inumber);
+		printf("Lock Read no Inode: %d\n", current_inumber);
 		lock(current_inumber, READ);
 		addLockedInode(locked_inodes, current_inumber);
 		inode_get(current_inumber, &nType, &data);
@@ -172,9 +174,11 @@ int lookupAux(char *name, LockedInodes *locked_inodes, int flag) {
 		path = strtok(NULL, delim);
 		printf("2 lock no inumber: %d (lookupAux)\n", current_inumber);
 		if (path == NULL && flag == MODIFY) {
+			printf("Lock Write no Inode: %d\n", current_inumber);
 			lock(current_inumber, WRITE);
 		}
 		else {
+			printf("Lock Read no Inode: %d\n", current_inumber);
 			lock(current_inumber, READ);
 		}
 		addLockedInode(locked_inodes, current_inumber);
