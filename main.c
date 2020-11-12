@@ -22,6 +22,7 @@ int numberThreads;
 FILE * inputFile;
 FILE * outputFile;
 
+pthread_mutex_t lock_commands;
 pthread_mutex_t lock_numCommands;
 pthread_mutex_t lock_consumeIndex;
 
@@ -94,8 +95,8 @@ int getNumberCommands() {
  */
 char* removeCommand() {
     pthread_mutex_lock(&lock_numCommands);
-    if (numberCommands > 0) {
-        numberCommands--;
+    if (numCommands > 0) {
+        numCommands--;
         int head = headQueue;
         headQueue++;
         pthread_mutex_unlock(&lock_numCommands);
@@ -122,8 +123,8 @@ void processInput() {
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
         while(getNumberCommands() > 9) {
-            pthread_mutex_unlock(&lock_produceIndex);
-            wait(produce, lock_commands);
+            pthread_mutex_unlock(&lock_numCommands);
+            pthread_cond_wait(&produce, &lock_commands);
         }
         
         char token, type;
@@ -165,16 +166,16 @@ void processInput() {
             }
         }
 
-        signal(consume);
+        pthread_cond_signal(&consume);
         pthread_mutex_unlock(&lock_commands);
     }
 
     while(getNumberCommands() > 9) {
-        pthread_mutex_unlock(&lock_produceIndex);
-        wait(produce, lock_commands);
+        pthread_mutex_unlock(&lock_numCommands);
+        pthread_cond_wait(&produce, &lock_commands);
     }
     insertCommand("bye");
-    signal(consume);
+    pthread_cond_signal(&consume);
     pthread_mutex_unlock(&lock_commands);
 
     fclose(inputFile);
@@ -245,6 +246,7 @@ void parallelization() {
     int i;
     pthread_t tid[numberThreads];
 
+    pthread_mutex_init(&lock_commands, NULL);
     pthread_mutex_init(&lock_numCommands, NULL);
     pthread_mutex_init(&lock_consumeIndex, NULL);
     pthread_cond_init(&consume, NULL);
@@ -269,6 +271,7 @@ void parallelization() {
         }
     }
     
+    pthread_mutex_destroy(&lock_commands);
     pthread_mutex_destroy(&lock_numCommands);
     pthread_mutex_destroy(&lock_consumeIndex);
     pthread_cond_destroy(&consume);

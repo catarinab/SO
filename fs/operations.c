@@ -141,7 +141,7 @@ int lookup_sub_node(char *name, DirEntry *entries) {
 
 /* Not included in operations.h because its not supposed to be used outside this
 file, since it doesnt have any locks. */
-int lookupCommands(char *name, LockedInodes *locked_inodes) {
+int lookupAux(char *name, LockedInodes *locked_inodes, int flag) {
 	char full_path[MAX_FILE_NAME];
 	char delim[] = "/";
 
@@ -154,21 +154,31 @@ int lookupCommands(char *name, LockedInodes *locked_inodes) {
 	type nType;
 	union Data data;
 
-	/* get root inode data */
-	printf("1 lock no inumber: %d (lookupCommands)\n", current_inumber);
-	lock(current_inumber, READ);
-	addLockedInode(locked_inodes, current_inumber);
-	inode_get(current_inumber, &nType, &data);
-
 	char *path = strtok(full_path, delim);
-
-	/* search for all sub nodes */
-	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
-		printf("2 lock no inumber: %d (lookupCommands)\n", current_inumber);
+	
+	if (path == NULL && flag == MODIFY) {
+		lock(current_inumber, WRITE);
+	}
+	else {
+		/* get root inode data */
+		printf("1 lock no inumber: %d (lookupAux)\n", current_inumber);
 		lock(current_inumber, READ);
 		addLockedInode(locked_inodes, current_inumber);
 		inode_get(current_inumber, &nType, &data);
+	}
+
+	/* search for all sub nodes */
+	while (path != NULL && (current_inumber = lookup_sub_node(path, data.dirEntries)) != FAIL) {
 		path = strtok(NULL, delim);
+		printf("2 lock no inumber: %d (lookupAux)\n", current_inumber);
+		if (path == NULL && flag == MODIFY) {
+			lock(current_inumber, WRITE);
+		}
+		else {
+			lock(current_inumber, READ);
+		}
+		addLockedInode(locked_inodes, current_inumber);
+		inode_get(current_inumber, &nType, &data);
 	}
 	printf("retornar inumber: %d\n", current_inumber);
 	return current_inumber;
@@ -186,7 +196,7 @@ int lookup(char *name) {
 	LockedInodes locked_inodes;
 	locked_inodes.size = 0;
 
-	int searchResult = lookupCommands(name, &locked_inodes);
+	int searchResult = lookupAux(name, &locked_inodes, LOOKUP);
 	unlockLockedInodes(&locked_inodes);
 
 	return searchResult;
@@ -212,7 +222,7 @@ int create(char *name, type nodeType){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookupCommands(parent_name, &locked_inodes);
+	parent_inumber = lookupAux(parent_name, &locked_inodes, MODIFY);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to create %s, invalid parent dir %s\n",
@@ -221,10 +231,6 @@ int create(char *name, type nodeType){
 		return FAIL;
 	}
 
-	printf("lock no inumber: %d (create)\n", parent_inumber);
-	trylock(parent_inumber, WRITE);
-	printf("successful lock no inumber: %d (create)\n", parent_inumber);
-	addLockedInode(&locked_inodes, parent_inumber);
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {
@@ -285,7 +291,7 @@ int delete(char *name){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
-	parent_inumber = lookupCommands(parent_name, &locked_inodes);
+	parent_inumber = lookupAux(parent_name, &locked_inodes, MODIFY);
 
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
@@ -293,10 +299,7 @@ int delete(char *name){
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-
-	printf("lock no inumber: %d (create)\n", parent_inumber);
-	lock(parent_inumber, WRITE);
-	addLockedInode(&locked_inodes, parent_inumber);
+	
 	inode_get(parent_inumber, &pType, &pdata);
 
 	if(pType != T_DIRECTORY) {

@@ -13,8 +13,10 @@
 #include "state.h"
 
 /* Flags for the functions that involve locks. */
-#define READ 0 /* Used to access the FS lock, when its a readwrite lock, and you want to read (locks). */
-#define WRITE 1 /* Used to access the FS lock, when its a readwrite lock, and you want to write (locks). */
+#define READ 0 /* Used to access the FS lock and you want to read. */
+#define WRITE 1 /* Used to access the FS lock, and you want to write. */
+#define LOOKUP 2 /* Used on the lookupAux function, when it's used for a lookup. */
+#define MODIFY 3 /* Used on the lookupAux function, when it's used for a create/delete. */
 
 /*
  * Contains the inumbers of the inodes locked
