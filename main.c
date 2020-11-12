@@ -93,6 +93,7 @@ int getNumberCommands() {
  *  - The command that was removed.
  */
 char* removeCommand() {
+    printf("ntrou no removeCommands\n");
     if (getNumberCommands() == 0) {
         pthread_mutex_unlock(&lock_numCommands);
         return NULL;
@@ -133,7 +134,7 @@ void processInput() {
             printf("lock processInput()\n");
         }
         if (flag) {
-            pthread_mutex_trylock(&lock_commands);
+            pthread_mutex_lock(&lock_commands);
             printf("lock processInput()\n");
             pthread_mutex_unlock(&lock_numCommands);
         }
@@ -220,14 +221,14 @@ void * applyCommands(void * ptr) {
             pthread_cond_wait(&consume, &lock_commands);
             printf("lock applyCommands() 1\n");
         }
+        printf("ola\n");
         if (flag) {
             pthread_mutex_lock(&lock_commands);
             printf("lock applyCommands() 2\n");
             pthread_mutex_unlock(&lock_numCommands);
         }
-
-          
         const char* command = removeCommand();
+        printf("saiu do removeCommand\n");
         if (command == NULL) {
             pthread_mutex_unlock(&lock_commands);
             continue;
