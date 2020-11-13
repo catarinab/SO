@@ -272,10 +272,12 @@ void * applyCommands(void * ptr) {
                     case 'f':
                         printf("Create file: %s\n", name);
                         create(name, T_FILE);
+                        printf("Creatou puta: %s.\n", name);
                         break;
                     case 'd':
                         printf("Create directory: %s\n", name);
                         create(name, T_DIRECTORY);
+                        printf("Creatou puta: %s.\n", name);
                         break;
                     default:
                         fprintf(stderr, "Error: invalid node type\n");
@@ -292,6 +294,7 @@ void * applyCommands(void * ptr) {
             case 'd':
                 printf("Delete: %s\n", name);
                 delete(name);
+                printf("Deletou puta: %s.\n", name);
                 break;
             default:{ /* error. */
                 fprintf(stderr, "Error: command to apply\n");
@@ -342,22 +345,22 @@ void destroySynch() {
     }
     /* numCommand's lock. */
     if (pthread_mutex_destroy(&lock_numCommands) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        fprintf(stderr, "Error: mutex lock destruction failed\n");
         exit(EXIT_FAILURE);
     }
     /* consumeIndex's lock. */
     if (pthread_mutex_destroy(&lock_consumeIndex) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        fprintf(stderr, "Error: mutex lock destruction failed\n");
         exit(EXIT_FAILURE);
     }
 
     /* Conditional Variables */
     if (pthread_cond_destroy(&consume) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        fprintf(stderr, "Error: mutex lock destruction failed\n");
         exit(EXIT_FAILURE);
     }
     if (pthread_cond_destroy(&produce) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        fprintf(stderr, "Error: mutex lock destruction failed\n");
         exit(EXIT_FAILURE);
     }
 }

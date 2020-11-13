@@ -20,7 +20,7 @@
  * Contains the inumbers of the inodes locked
  */
 typedef struct lockedInodes {
-	int *inumbers;
+	int * inumbers;
 	int size;
 } LockedInodes;
 

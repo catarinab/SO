@@ -1,3 +1,10 @@
+/* 
+ * (Ficheiro alterado)
+ * Grupo 27:
+ * 93230 Catarina Bento
+ * 94179 Luis Freire D'Andrade
+*/
+
 #ifndef INODES_H
 #define INODES_H
 
