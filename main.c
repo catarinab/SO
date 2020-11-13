@@ -112,7 +112,6 @@ int conditionNumberCommands(int comparee) {
  *  - The command that was removed.
  */
 char* removeCommand() {
-    printf("Entrou no removeCommands\n");
     if (conditionNumberCommands(0)) {
         return NULL;
     }
@@ -121,9 +120,11 @@ char* removeCommand() {
     int head = consumeIndex;
     consumeIndex = (consumeIndex + 1) % MAX_COMMANDS;
     numCommands--;
+    char *command = (char *) malloc(sizeof(char) * (strlen(inputCommands[head]) + 1));
+    strcpy(command, inputCommands[head]);
     unlockCommands(&lock_numCommands);
     unlockCommands(&lock_consumeIndex);
-    return inputCommands[head];
+    return command;
 }
 
 /* Throws an error when a command is invalid.
@@ -145,7 +146,6 @@ void processInput() {
         lockCommands(&lock_commands);
         while(conditionNumberCommands(MAX_COMMANDS)) {
             pthread_cond_wait(&produce, &lock_commands);
-            printf("lock processInput()\n");
         }
         
         char token, type;
@@ -156,7 +156,6 @@ void processInput() {
         if (numTokens < 1) {
             continue;
         }
-        printf("%s\n", line);
         switch (token) {
             case 'c':
                 if(numTokens != 3)
@@ -189,11 +188,9 @@ void processInput() {
 
         pthread_cond_signal(&consume);
         unlockCommands(&lock_commands);
-        printf("unlock processInput()\n");
     }
-    printf("COMANDOS PRODUZIDOS\n");
-    pthread_cond_broadcast(&consume);
     eof = 1;
+    pthread_cond_broadcast(&consume);
 
     fclose(inputFile);
 }
@@ -205,60 +202,37 @@ void processInput() {
  *  - Pointer to results (needed because this function is used by threads).
  */
 void * applyCommands(void * ptr) {
-    int ola;
-    while (!eof || !((ola = conditionNumberCommands(0)) == 1)) {
-        printf("OLAAA\n"); 
+    while (!eof || !conditionNumberCommands(0)) { 
         lockCommands(&lock_commands);
-        printf("lock applyCommands() 1\n");
         while (!eof && conditionNumberCommands(0)) {
             lockCommands(&lock_numCommands);
-            printf("EOF: %d\nNumero de comandos: %d\n", eof, numCommands);
             unlockCommands(&lock_numCommands);
-            printf("puta à espera\n");
-            printf("unlock applyCommands() 1\n");
             pthread_cond_wait(&consume, &lock_commands);
-            printf("puta livre\n");
-            printf("lock applyCommands() 1\n");
         }
-        printf("!!!!!!!!!!!!!!!!!!\n");
-        lockCommands(&lock_numCommands);
-        printf("EOF: %d\nNumero de comandos: %d\n", eof, numCommands);
-        unlockCommands(&lock_numCommands);
-        printf("!!!!!!!!!!!!!!!!!!\n");
+        
         if (eof && conditionNumberCommands(0)) {
-            printf("vai sair\n");
             unlockCommands(&lock_commands);
-            pthread_cond_broadcast(&consume);
             break;
         }
-
-        printf("!!!!!!!!! 1\n");
-        const char* command = removeCommand();
-        printf("saiu do removeCommand\n");
         
-        printf("!!!!!!!!! 2\n");
+        char* command = removeCommand();
+
+        pthread_cond_signal(&produce);
+        unlockCommands(&lock_commands);
+        
         if (command == NULL) {
             unlockCommands(&lock_commands);
             continue;
         }
-        printf("!!!!!!!!! 3\n");
-
-        pthread_cond_signal(&produce);
-        unlockCommands(&lock_commands);
-        printf("unlock applyCommands()\n");
-
-        printf("!!!!!!!!! 4\n");
         
         char token, type;
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
+        free(command);
         if (numTokens < 2 && token != 'q') {
-            printf("command: %s\n", command);
             fprintf(stderr, "Error: invalid command in Queue\n");
             exit(EXIT_FAILURE);
         }
-
-        printf("!!!!!!!!! 5\n");
 
         int searchResult;
         switch (token) {
@@ -293,9 +267,7 @@ void * applyCommands(void * ptr) {
                 exit(EXIT_FAILURE);
             }
         }
-        printf("!!!!!!!!! 6\n");
     }
-    printf("!!!!!!!!! 7\n");
     return NULL;
 }
 
@@ -327,7 +299,6 @@ void parallelization() {
             fprintf(stderr, "Error: couldnt join threads\n");
             exit(EXIT_FAILURE);
         }
-        printf("Deu join a thread: %d\n", i);
     }
     
     pthread_mutex_destroy(&lock_commands);
