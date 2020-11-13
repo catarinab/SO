@@ -192,6 +192,7 @@ void processInput() {
         printf("unlock processInput()\n");
     }
     printf("COMANDOS PRODUZIDOS\n");
+    pthread_cond_broadcast(&consume);
     eof = 1;
 
     fclose(inputFile);
@@ -206,9 +207,13 @@ void processInput() {
 void * applyCommands(void * ptr) {
     int ola;
     while (!eof || !((ola = conditionNumberCommands(0)) == 1)) {
+        printf("OLAAA\n"); 
         lockCommands(&lock_commands);
         printf("lock applyCommands() 1\n");
         while (!eof && conditionNumberCommands(0)) {
+            lockCommands(&lock_numCommands);
+            printf("EOF: %d\nNumero de comandos: %d\n", eof, numCommands);
+            unlockCommands(&lock_numCommands);
             printf("puta à espera\n");
             printf("unlock applyCommands() 1\n");
             pthread_cond_wait(&consume, &lock_commands);
