@@ -34,6 +34,20 @@ int produceIndex = 0;
 int consumeIndex = 0;
 int eof = 0;
 
+void lockCommands(pthread_mutex_t * lock) {
+    if (pthread_mutex_lock(lock) != 0) {
+		fprintf(stderr, "Error: readwrite lock failed\n");
+		exit(EXIT_FAILURE);
+    }
+}
+
+void unlockCommands(pthread_mutex_t * lock) {
+    if (pthread_mutex_unlock(lock) != 0) {
+		fprintf(stderr, "Error: readwrite lock failed\n");
+		exit(EXIT_FAILURE);
+    }
+}
+
 /* Processes the arguments from server call.
  * Input:
  *  - argc: number of arguments.
@@ -73,11 +87,11 @@ void processArgs(int argc, char * argv[]) {
  */
 int insertCommand(char* data) {
     /* Shared variables dont need protection since threads will not be involved. */
-    pthread_mutex_lock(&lock_numCommands);
+    lockCommands(&lock_numCommands);
     strcpy(inputCommands[produceIndex], data);
     produceIndex = (produceIndex + 1) % MAX_COMMANDS;
     numCommands++;
-    pthread_mutex_unlock(&lock_numCommands);
+    unlockCommands(&lock_numCommands);
     return 1;
 }
 
@@ -87,9 +101,9 @@ int insertCommand(char* data) {
  *  - comparee: the number comparing to.
  */
 int conditionNumberCommands(int comparee) {
-    pthread_mutex_lock(&lock_numCommands);
+    lockCommands(&lock_numCommands);
     int result = (numCommands == comparee);
-    pthread_mutex_unlock(&lock_numCommands);
+    unlockCommands(&lock_numCommands);
     return result;
 }
 
@@ -102,13 +116,13 @@ char* removeCommand() {
     if (conditionNumberCommands(0)) {
         return NULL;
     }
-    pthread_mutex_lock(&lock_numCommands);
-    pthread_mutex_lock(&lock_consumeIndex);
+    lockCommands(&lock_numCommands);
+    lockCommands(&lock_consumeIndex);
     int head = consumeIndex;
     consumeIndex = (consumeIndex + 1) % MAX_COMMANDS;
     numCommands--;
-    pthread_mutex_unlock(&lock_numCommands);
-    pthread_mutex_unlock(&lock_consumeIndex);
+    unlockCommands(&lock_numCommands);
+    unlockCommands(&lock_consumeIndex);
     return inputCommands[head];
 }
 
@@ -128,7 +142,7 @@ void processInput() {
 
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
-        pthread_mutex_lock(&lock_commands);
+        lockCommands(&lock_commands);
         while(conditionNumberCommands(MAX_COMMANDS)) {
             pthread_cond_wait(&produce, &lock_commands);
             printf("lock processInput()\n");
@@ -174,7 +188,7 @@ void processInput() {
         }
 
         pthread_cond_signal(&consume);
-        pthread_mutex_unlock(&lock_commands);
+        unlockCommands(&lock_commands);
         printf("unlock processInput()\n");
     }
     printf("COMANDOS PRODUZIDOS\n");
@@ -192,7 +206,7 @@ void processInput() {
 void * applyCommands(void * ptr) {
     int ola;
     while (!eof || !((ola = conditionNumberCommands(0)) == 1)) {
-        pthread_mutex_lock(&lock_commands);
+        lockCommands(&lock_commands);
         printf("lock applyCommands() 1\n");
         while (!eof && conditionNumberCommands(0)) {
             printf("puta à espera\n");
@@ -202,13 +216,13 @@ void * applyCommands(void * ptr) {
             printf("lock applyCommands() 1\n");
         }
         printf("!!!!!!!!!!!!!!!!!!\n");
-        pthread_mutex_lock(&lock_numCommands);
+        lockCommands(&lock_numCommands);
         printf("EOF: %d\nNumero de comandos: %d\n", eof, numCommands);
-        pthread_mutex_unlock(&lock_numCommands);
+        unlockCommands(&lock_numCommands);
         printf("!!!!!!!!!!!!!!!!!!\n");
         if (eof && conditionNumberCommands(0)) {
             printf("vai sair\n");
-            pthread_mutex_unlock(&lock_commands);
+            unlockCommands(&lock_commands);
             pthread_cond_broadcast(&consume);
             break;
         }
@@ -219,13 +233,13 @@ void * applyCommands(void * ptr) {
         
         printf("!!!!!!!!! 2\n");
         if (command == NULL) {
-            pthread_mutex_unlock(&lock_commands);
+            unlockCommands(&lock_commands);
             continue;
         }
         printf("!!!!!!!!! 3\n");
 
         pthread_cond_signal(&produce);
-        pthread_mutex_unlock(&lock_commands);
+        unlockCommands(&lock_commands);
         printf("unlock applyCommands()\n");
 
         printf("!!!!!!!!! 4\n");
