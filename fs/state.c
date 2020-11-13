@@ -7,6 +7,49 @@
 
 inode_t inode_table[INODE_TABLE_SIZE];
 
+/* Given a flag, locks the respective lock.
+ * Input:
+ *  - inumber: the number of the inode that is going to be locked.
+ *  - flag: the flag that indicates which lock to lock (flag descriptions in 
+ * operations.h). 
+ */
+void lock(int inumber, int flag) {
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
+        printf("lock: invalid inumber\n");
+        exit(EXIT_FAILURE);
+    }
+
+	if (flag == READ) {
+		if (pthread_rwlock_rdlock(&inode_table[inumber].lock) != 0) {
+			fprintf(stderr, "Error: readwrite lock failed\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+	else if (flag == WRITE) {
+		if( pthread_rwlock_wrlock(&inode_table[inumber].lock) != 0) {
+			fprintf(stderr, "Error: readwrite lock failed\n");
+			exit(EXIT_FAILURE);
+		}
+	}
+}
+
+/* Given a flag, unlocks the respective lock.
+ * Input:
+ *  - inumber: the number of the inode that is going to be locked.
+ *  - flag: the flag that indicates which lock to unlock (flag descriptions in 
+ * operations.h).
+ */
+void unlock(int inumber) {
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
+        printf("lock: invalid inumber\n");
+        exit(EXIT_FAILURE);
+    }
+
+	if (pthread_rwlock_unlock(&inode_table[inumber].lock) != 0) {
+		fprintf(stderr, "Error: readwrite unlock failed\n");
+		exit(EXIT_FAILURE);
+	}
+}
 
 /*
  * Sleeps for synchronization testing.
@@ -94,141 +137,3 @@ int inode_delete(int inumber) {
     /* see inode_table_destroy function */
     if (inode_table[inumber].data.dirEntries)
         free(inode_table[inumber].data.dirEntries);
-    return SUCCESS;
-}
-
-/*
- * Copies the contents of the i-node into the arguments.
- * Only the fields referenced by non-null arguments are copied.
- * Input:
- *  - inumber: identifier of the i-node
- *  - nType: pointer to type
- *  - data: pointer to data
- * Returns: SUCCESS or FAIL
- */
-int inode_get(int inumber, type *nType, union Data *data) {
-    /* Used for testing synchronization speedup */
-    insert_delay(DELAY);
-
-    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
-        printf("inode_get: invalid inumber %d\n", inumber);
-        return FAIL;
-    }
-
-    if (nType)
-        *nType = inode_table[inumber].nodeType;
-
-    if (data)
-        *data = inode_table[inumber].data;
-
-    return SUCCESS;
-}
-
-
-/*
- * Resets an entry for a directory.
- * Input:
- *  - inumber: identifier of the i-node
- *  - sub_inumber: identifier of the sub i-node entry
- * Returns: SUCCESS or FAIL
- */
-int dir_reset_entry(int inumber, int sub_inumber) {
-    /* Used for testing synchronization speedup */
-    insert_delay(DELAY);
-
-    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
-        printf("inode_reset_entry: invalid inumber\n");
-        return FAIL;
-    }
-
-    if (inode_table[inumber].nodeType != T_DIRECTORY) {
-        printf("inode_reset_entry: can only reset entry to directories\n");
-        return FAIL;
-    }
-
-    if ((sub_inumber < FREE_INODE) || (sub_inumber > INODE_TABLE_SIZE) || (inode_table[sub_inumber].nodeType == T_NONE)) {
-        printf("inode_reset_entry: invalid entry inumber\n");
-        return FAIL;
-    }
-
-    
-    for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-        if (inode_table[inumber].data.dirEntries[i].inumber == sub_inumber) {
-            inode_table[inumber].data.dirEntries[i].inumber = FREE_INODE;
-            inode_table[inumber].data.dirEntries[i].name[0] = '\0';
-            return SUCCESS;
-        }
-    }
-    return FAIL;
-}
-
-
-/*
- * Adds an entry to the i-node directory data.
- * Input:
- *  - inumber: identifier of the i-node
- *  - sub_inumber: identifier of the sub i-node entry
- *  - sub_name: name of the sub i-node entry 
- * Returns: SUCCESS or FAIL
- */
-int dir_add_entry(int inumber, int sub_inumber, char *sub_name) {
-    /* Used for testing synchronization speedup */
-    insert_delay(DELAY);
-
-    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
-        printf("inode_add_entry: invalid inumber\n");
-        return FAIL;
-    }
-
-    if (inode_table[inumber].nodeType != T_DIRECTORY) {
-        printf("inode_add_entry: can only add entry to directories\n");
-        return FAIL;
-    }
-
-    if ((sub_inumber < 0) || (sub_inumber > INODE_TABLE_SIZE) || (inode_table[sub_inumber].nodeType == T_NONE)) {
-        printf("inode_add_entry: invalid entry inumber\n");
-        return FAIL;
-    }
-
-    if (strlen(sub_name) == 0 ) {
-        printf("inode_add_entry: \
-               entry name must be non-empty\n");
-        return FAIL;
-    }
-    
-    for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-        if (inode_table[inumber].data.dirEntries[i].inumber == FREE_INODE) {
-            inode_table[inumber].data.dirEntries[i].inumber = sub_inumber;
-            strcpy(inode_table[inumber].data.dirEntries[i].name, sub_name);
-            return SUCCESS;
-        }
-    }
-    return FAIL;
-}
-
-
-/*
- * Prints the i-nodes table.
- * Input:
- *  - inumber: identifier of the i-node
- *  - name: pointer to the name of current file/dir
- */
-void inode_print_tree(FILE *fp, int inumber, char *name) {
-    if (inode_table[inumber].nodeType == T_FILE) {
-        fprintf(fp, "%s\n", name);
-        return;
-    }
-
-    if (inode_table[inumber].nodeType == T_DIRECTORY) {
-        fprintf(fp, "%s\n", name);
-        for (int i = 0; i < MAX_DIR_ENTRIES; i++) {
-            if (inode_table[inumber].data.dirEntries[i].inumber != FREE_INODE) {
-                char path[MAX_FILE_NAME];
-                if (snprintf(path, sizeof(path), "%s/%s", name, inode_table[inumber].data.dirEntries[i].name) > sizeof(path)) {
-                    fprintf(stderr, "truncation when building full path\n");
-                }
-                inode_print_tree(fp, inode_table[inumber].data.dirEntries[i].inumber, path);
-            }
-        }
-    }
-}

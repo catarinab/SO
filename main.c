@@ -22,18 +22,18 @@ int numberThreads;
 FILE * inputFile;
 FILE * outputFile;
 
-pthread_mutex_t lock_commands;
-pthread_mutex_t lock_numCommands;
-pthread_mutex_t lock_consumeIndex;
+/* Variables needed for the program. */
+char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
+int numCommands, produceIndex, consumeIndex, eof;
 
+/* Mutexes. */
+pthread_mutex_t lock_commands, lock_numCommands, lock_consumeIndex;
+
+/* Conditional variables. */
 pthread_cond_t consume, produce;
 
-char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int numCommands = 0;
-int produceIndex = 0;
-int consumeIndex = 0;
-int eof = 0;
-
+/* Locks the respective lock.
+ */
 void lockCommands(pthread_mutex_t * lock) {
     if (pthread_mutex_lock(lock) != 0) {
 		fprintf(stderr, "Error: readwrite lock failed\n");
@@ -41,6 +41,8 @@ void lockCommands(pthread_mutex_t * lock) {
     }
 }
 
+/* Unlocks the respective lock.
+ */
 void unlockCommands(pthread_mutex_t * lock) {
     if (pthread_mutex_unlock(lock) != 0) {
 		fprintf(stderr, "Error: readwrite lock failed\n");
@@ -86,12 +88,14 @@ void processArgs(int argc, char * argv[]) {
  *  - Integer that represents the success of the function call.
  */
 int insertCommand(char* data) {
-    /* Shared variables dont need protection since threads will not be involved. */
     lockCommands(&lock_numCommands);
+
     strcpy(inputCommands[produceIndex], data);
     produceIndex = (produceIndex + 1) % MAX_COMMANDS;
     numCommands++;
+
     unlockCommands(&lock_numCommands);
+
     return 1;
 }
 
@@ -100,10 +104,11 @@ int insertCommand(char* data) {
  * Input:
  *  - comparee: the number comparing to.
  */
-int conditionNumberCommands(int comparee) {
+int numCommandsEquals(int comparee) {
     lockCommands(&lock_numCommands);
     int result = (numCommands == comparee);
     unlockCommands(&lock_numCommands);
+
     return result;
 }
 
@@ -112,18 +117,23 @@ int conditionNumberCommands(int comparee) {
  *  - The command that was removed.
  */
 char* removeCommand() {
-    if (conditionNumberCommands(0)) {
+    if (numCommandsEquals(0)) {
         return NULL;
     }
+
     lockCommands(&lock_numCommands);
     lockCommands(&lock_consumeIndex);
+
     int head = consumeIndex;
     consumeIndex = (consumeIndex + 1) % MAX_COMMANDS;
     numCommands--;
+    /* Copy of the command */
     char *command = (char *) malloc(sizeof(char) * (strlen(inputCommands[head]) + 1));
     strcpy(command, inputCommands[head]);
+
     unlockCommands(&lock_numCommands);
     unlockCommands(&lock_consumeIndex);
+
     return command;
 }
 
@@ -143,9 +153,13 @@ void processInput() {
 
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
+        /* Conditional variable */
         lockCommands(&lock_commands);
-        while(conditionNumberCommands(MAX_COMMANDS)) {
-            pthread_cond_wait(&produce, &lock_commands);
+        while(numCommandsEquals(MAX_COMMANDS)) {
+            if (pthread_cond_wait(&produce, &lock_commands) != 0) {
+                fprintf(stderr, "Error: conditional variable wait failed\n");
+                exit(EXIT_FAILURE);
+            }
         }
         
         char token, type;
@@ -186,11 +200,19 @@ void processInput() {
             }
         }
 
-        pthread_cond_signal(&consume);
+        /* Conditional variable signal */
+        if (pthread_cond_signal(&consume) != 0) {
+            fprintf(stderr, "Error: conditional variable signal failed\n");
+            exit(EXIT_FAILURE);
+        }
         unlockCommands(&lock_commands);
     }
+
     eof = 1;
-    pthread_cond_broadcast(&consume);
+    if (pthread_cond_broadcast(&consume) != 0) {
+        fprintf(stderr, "Error: conditional variable broadcast failed\n");
+        exit(EXIT_FAILURE);
+    }
 
     fclose(inputFile);
 }
@@ -202,22 +224,30 @@ void processInput() {
  *  - Pointer to results (needed because this function is used by threads).
  */
 void * applyCommands(void * ptr) {
-    while (!eof || !conditionNumberCommands(0)) { 
+    while (!eof || !numCommandsEquals(0)) {
+        /* Conditional variable */
         lockCommands(&lock_commands);
-        while (!eof && conditionNumberCommands(0)) {
-            lockCommands(&lock_numCommands);
-            unlockCommands(&lock_numCommands);
-            pthread_cond_wait(&consume, &lock_commands);
+        while (!eof && numCommandsEquals(0)) {
+            if (pthread_cond_wait(&consume, &lock_commands) != 0) {
+                fprintf(stderr, "Error: conditional variable wait failed\n");
+                exit(EXIT_FAILURE);
+            }
         }
         
-        if (eof && conditionNumberCommands(0)) {
+        /* No more commands to be applied */
+        if (eof && numCommandsEquals(0)) {
             unlockCommands(&lock_commands);
             break;
         }
         
         char* command = removeCommand();
+        /* Dynamically allocated memory for command */
 
-        pthread_cond_signal(&produce);
+        /* Conditional variable signal */
+        if (pthread_cond_signal(&produce) != 0) {
+            fprintf(stderr, "Error: conditional variable signal failed\n");
+            exit(EXIT_FAILURE);
+        }
         unlockCommands(&lock_commands);
         
         if (command == NULL) {
@@ -229,7 +259,8 @@ void * applyCommands(void * ptr) {
         char name[MAX_INPUT_SIZE];
         int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
         free(command);
-        if (numTokens < 2 && token != 'q') {
+        
+        if (numTokens < 2) {
             fprintf(stderr, "Error: invalid command in Queue\n");
             exit(EXIT_FAILURE);
         }
@@ -271,18 +302,74 @@ void * applyCommands(void * ptr) {
     return NULL;
 }
 
+/* Initializes all the locks and conditional variables needed.
+ */
+void initSynch() {
+    /* command's lock. */
+    if (pthread_mutex_init(&lock_commands, NULL) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    /* numCommand's lock. */
+    if (pthread_mutex_init(&lock_numCommands, NULL) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    /* consumeIndex's lock. */
+    if (pthread_mutex_init(&lock_consumeIndex, NULL) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    
+    /* Conditional Variables */
+    if (pthread_cond_init(&consume, NULL) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_cond_init(&produce, NULL) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
+/* Destroys all the locks and conditional variables created.
+ */
+void destroySynch() {
+    /* Commands lock. */
+    if (pthread_mutex_destroy(&lock_commands)!= 0) {
+        fprintf(stderr, "Error: mutex lock destruction failed\n");
+        exit(EXIT_FAILURE);  
+    }
+    /* numCommand's lock. */
+    if (pthread_mutex_destroy(&lock_numCommands) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    /* consumeIndex's lock. */
+    if (pthread_mutex_destroy(&lock_consumeIndex) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Conditional Variables */
+    if (pthread_cond_destroy(&consume) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+    if (pthread_cond_destroy(&produce) != 0) {
+        fprintf(stderr, "Error: mutex lock initialization failed\n");
+        exit(EXIT_FAILURE);
+    }
+}
+
 /* Initializes the locks and condition variablrs, and creates the threads. Then, 
  * it waits for the threads to join and destroys the locks.
  */
 void parallelization() {
     int i;
     pthread_t tid[numberThreads];
-    
-    pthread_mutex_init(&lock_commands, NULL);
-    pthread_mutex_init(&lock_numCommands, NULL);
-    pthread_mutex_init(&lock_consumeIndex, NULL);
-    pthread_cond_init(&consume, NULL);
-    pthread_cond_init(&produce, NULL);
+
+    initSynch();
 
     for (i = 0; i < numberThreads; i++) {
         if (pthread_create(&tid[i], NULL, applyCommands, NULL) != 0) {
@@ -300,12 +387,8 @@ void parallelization() {
             exit(EXIT_FAILURE);
         }
     }
-    
-    pthread_mutex_destroy(&lock_commands);
-    pthread_mutex_destroy(&lock_numCommands);
-    pthread_mutex_destroy(&lock_consumeIndex);
-    pthread_cond_destroy(&consume);
-    pthread_cond_destroy(&produce);
+
+    destroySynch();
 }
 
 /* Main.
@@ -313,6 +396,12 @@ void parallelization() {
 int main(int argc, char* argv[]) {
     struct timeval tick, tock;
     double time;
+
+    /* Initializes global variables. */
+    numCommands = 0;
+    produceIndex = 0;
+    consumeIndex = 0;
+    eof = 0;
 
     /* Initializes filesystem. */
     init_fs();
