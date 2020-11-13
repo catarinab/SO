@@ -29,7 +29,13 @@ void addLockedInode(LockedInodes * locked_inodes, int inumber){
 void unlockLockedInodes(LockedInodes * locked_inodes){
 	for(int i = 0; i < locked_inodes->size; i++) {
 		unlock(locked_inodes->inumbers[i]);
-		printf("unlocked %d hehehe\n", locked_inodes->inumbers[i]);
+		if (pthread_rwlock_trywrlock(&inode_table[locked_inodes->inumbers[i]].lock) == 0) {
+			printf("unlocked %d hehehe\n", locked_inodes->inumbers[i]);
+			pthread_rwlock_unlock(&inode_table[locked_inodes->inumbers[i]].lock);
+		}
+		else {
+			printf("not unlocked %d oinc\n", locked_inodes->inumbers[i]);
+		}
 	}
 	free(locked_inodes->inumbers);
 }

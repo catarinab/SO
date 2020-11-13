@@ -12,7 +12,7 @@
 #include "state.h"
 #include "../tecnicofs-api-constants.h"
 
-inode_t inode_table[INODE_TABLE_SIZE];
+/*inode_t inode_table[INODE_TABLE_SIZE];*/
 
 /* Given a flag, locks the respective lock.
  * Input:
