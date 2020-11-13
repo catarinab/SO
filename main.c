@@ -32,6 +32,7 @@ char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
 int numCommands = 0;
 int produceIndex = 0;
 int consumeIndex = 0;
+int eof = 0;
 
 /* Processes the arguments from server call.
  * Input:
@@ -74,18 +75,22 @@ int insertCommand(char* data) {
     /* Shared variables dont need protection since threads will not be involved. */
     pthread_mutex_lock(&lock_numCommands);
     strcpy(inputCommands[produceIndex], data);
-    produceIndex = (produceIndex + 1) % 10;
+    produceIndex = (produceIndex + 1) % MAX_COMMANDS;
     numCommands++;
     pthread_mutex_unlock(&lock_numCommands);
     return 1;
 }
 
-/* Returns number of Commands while protecting with a lock the global variable numberCommands.
+/* Returns a boolean that represents if the global variable numberCommands is 
+ * equal to a number. 
+ * Input:
+ *  - comparee: the number comparing to.
  */
-int getNumberCommands() {
+int conditionNumberCommands(int comparee) {
     pthread_mutex_lock(&lock_numCommands);
-    int nCommands = numCommands;
-    return nCommands;
+    int result = (numCommands == comparee);
+    pthread_mutex_unlock(&lock_numCommands);
+    return result;
 }
 
 /* Removes a command from inputCommands.
@@ -93,17 +98,15 @@ int getNumberCommands() {
  *  - The command that was removed.
  */
 char* removeCommand() {
-    printf("ntrou no removeCommands\n");
-    if (getNumberCommands() == 0) {
-        pthread_mutex_unlock(&lock_numCommands);
+    printf("Entrou no removeCommands\n");
+    if (conditionNumberCommands(0)) {
         return NULL;
     }
+    pthread_mutex_lock(&lock_numCommands);
     pthread_mutex_lock(&lock_consumeIndex);
     int head = consumeIndex;
-    if (inputCommands[head][0] != 'q') {
-        consumeIndex = (consumeIndex + 1) % 10;
-        numCommands--;
-    }
+    consumeIndex = (consumeIndex + 1) % MAX_COMMANDS;
+    numCommands--;
     pthread_mutex_unlock(&lock_numCommands);
     pthread_mutex_unlock(&lock_consumeIndex);
     return inputCommands[head];
@@ -122,26 +125,17 @@ void errorParse() {
 void processInput() {
     /* Shared variables dont need protection since threads will not be involved. */
     char line[MAX_INPUT_SIZE];
-    int flag;
 
     /* break loop with ^Z or ^D. */
     while (fgets(line, sizeof(line)/sizeof(char), inputFile)) {
-        flag = 1;
-        while(getNumberCommands() > 9) {
-            flag = 0;
-            pthread_mutex_unlock(&lock_numCommands);
+        pthread_mutex_lock(&lock_commands);
+        while(conditionNumberCommands(MAX_COMMANDS)) {
             pthread_cond_wait(&produce, &lock_commands);
             printf("lock processInput()\n");
-        }
-        if (flag) {
-            pthread_mutex_lock(&lock_commands);
-            printf("lock processInput()\n");
-            pthread_mutex_unlock(&lock_numCommands);
         }
         
         char token, type;
         char name[MAX_INPUT_SIZE];
-        
         int numTokens = sscanf(line, "%c %s %c", &token, name, &type);
 
         /* perform minimal validation. */
@@ -183,23 +177,8 @@ void processInput() {
         pthread_mutex_unlock(&lock_commands);
         printf("unlock processInput()\n");
     }
-
-    flag = 1;
-    while(getNumberCommands() > 9) {
-        flag = 0;
-        pthread_mutex_unlock(&lock_numCommands);
-        pthread_cond_wait(&produce, &lock_commands);
-        printf("lock processInput()\n");
-    }
-    if (flag) {
-        pthread_mutex_lock(&lock_commands);
-        printf("lock processInput()\n");
-        pthread_mutex_unlock(&lock_numCommands);
-    }
-    insertCommand("q");
-    pthread_cond_signal(&consume);
-    pthread_mutex_unlock(&lock_commands);
-    printf("unlock processInput()\n");
+    printf("COMANDOS PRODUZIDOS\n");
+    eof = 1;
 
     fclose(inputFile);
 }
@@ -211,33 +190,45 @@ void processInput() {
  *  - Pointer to results (needed because this function is used by threads).
  */
 void * applyCommands(void * ptr) {
-    int flag;
-    
-    while (1) {
-        flag = 1;
-        while (getNumberCommands() <= 0) {
-            flag = 0;
-            pthread_mutex_unlock(&lock_numCommands);
+    int ola;
+    while (!eof || !((ola = conditionNumberCommands(0)) == 1)) {
+        pthread_mutex_lock(&lock_commands);
+        printf("lock applyCommands() 1\n");
+        while (!eof && conditionNumberCommands(0)) {
+            printf("puta à espera\n");
+            printf("unlock applyCommands() 1\n");
             pthread_cond_wait(&consume, &lock_commands);
+            printf("puta livre\n");
             printf("lock applyCommands() 1\n");
         }
-        printf("ola\n");
-        if (flag) {
-            pthread_mutex_lock(&lock_commands);
-            printf("lock applyCommands() 2\n");
-            pthread_mutex_unlock(&lock_numCommands);
+        printf("!!!!!!!!!!!!!!!!!!\n");
+        pthread_mutex_lock(&lock_numCommands);
+        printf("EOF: %d\nNumero de comandos: %d\n", eof, numCommands);
+        pthread_mutex_unlock(&lock_numCommands);
+        printf("!!!!!!!!!!!!!!!!!!\n");
+        if (eof && conditionNumberCommands(0)) {
+            printf("vai sair\n");
+            pthread_mutex_unlock(&lock_commands);
+            pthread_cond_broadcast(&consume);
+            break;
         }
+
+        printf("!!!!!!!!! 1\n");
         const char* command = removeCommand();
         printf("saiu do removeCommand\n");
+        
+        printf("!!!!!!!!! 2\n");
         if (command == NULL) {
             pthread_mutex_unlock(&lock_commands);
             continue;
         }
+        printf("!!!!!!!!! 3\n");
 
-        
         pthread_cond_signal(&produce);
         pthread_mutex_unlock(&lock_commands);
         printf("unlock applyCommands()\n");
+
+        printf("!!!!!!!!! 4\n");
         
         char token, type;
         char name[MAX_INPUT_SIZE];
@@ -248,11 +239,7 @@ void * applyCommands(void * ptr) {
             exit(EXIT_FAILURE);
         }
 
-        if (token == 'q') {
-            printf("Q!!!\n");
-            pthread_cond_broadcast(&consume);
-            break;
-        }
+        printf("!!!!!!!!! 5\n");
 
         int searchResult;
         switch (token) {
@@ -287,12 +274,14 @@ void * applyCommands(void * ptr) {
                 exit(EXIT_FAILURE);
             }
         }
+        printf("!!!!!!!!! 6\n");
     }
+    printf("!!!!!!!!! 7\n");
     return NULL;
 }
 
-/* Initializes the locks and creates the threads. Then, it waits for the threads 
- * to join and destroys the locks.
+/* Initializes the locks and condition variablrs, and creates the threads. Then, 
+ * it waits for the threads to join and destroys the locks.
  */
 void parallelization() {
     int i;
@@ -319,7 +308,7 @@ void parallelization() {
             fprintf(stderr, "Error: couldnt join threads\n");
             exit(EXIT_FAILURE);
         }
-        pthread_cond_broadcast(&consume);
+        printf("Deu join a thread: %d\n", i);
     }
     
     pthread_mutex_destroy(&lock_commands);
