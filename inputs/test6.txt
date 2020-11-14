@@ -1,0 +1,152 @@
+# Teste de paralelismo
+# empiricamente, corre bem com 2 a 6 tarefas
+# diferença entre correr com 1 vs 2,4... -> -50% do tempo
+# (aumentar o delay é desnecessário - testado com 5000000)
+# Criação de ficheiros base
+c /a d
+c /b d
+c /a d
+c /b d
+c /a d
+c /b d
+c /a d
+c /b d
+# (assegurar que estão lá)
+l /
+l /
+l /
+l /a
+l /b
+l /
+l /
+l /
+# (2o nível de diretorias)
+c /a/a d
+c /b/b d
+c /a/c d
+c /b/d d
+# (assegurar outra vez)
+l /
+l /
+l /
+l /
+l /
+l /
+l /
+l /
+l /
+# 3o nível de diretorias
+c /a/a/a d
+c /b/b/b d
+c /a/c/c d
+c /b/d/d d
+c /a/a/b d
+c /b/b/c d
+c /a/c/d d
+c /b/d/e d
+l /
+l /
+l /
+l /
+c /a/a/a/a f
+c /b/b/b/b f
+c /a/c/c/c f
+c /b/d/d/d f
+l /
+l /
+l /
+l /
+l /a
+l /b
+l /a
+l /b
+l /
+l /
+# A partir daqui, cada bloco de 10 comandos pode executar-se completamente em paralelo
+c /a/a/a/b1 d
+c /a/a/b/c1 d
+c /b/b/b/d1 d
+c /b/b/c/e1 d
+c /a/c/c/f1 d
+c /a/c/d/g1 d
+c /b/d/d/h1 d
+c /b/d/e/i1 d
+l /
+l /
+# (novo bloco em paralelo)
+c /a/a/a/b2 d
+c /a/a/b/c2 d
+c /b/b/b/d2 d
+c /b/b/c/e2 d
+c /a/c/c/f2 d
+c /a/c/d/g2 d
+c /b/d/d/h2 d
+c /b/d/e/i2 d
+l /
+l /
+# (novo bloco em paralelo)
+d /a/a/a/b1
+d /a/a/b/c1
+d /b/b/b/d1
+d /b/b/c/e1
+d /a/c/c/f1
+d /a/c/d/g1
+d /b/d/d/h1
+d /b/d/e/i1
+l /
+l /
+# (novo bloco em paralelo)
+d /a/a/a/b2
+d /a/a/b/c2
+d /b/b/b/d2
+d /b/b/c/e2
+d /a/c/c/f2
+d /a/c/d/g2
+d /b/d/d/h2
+d /b/d/e/i2
+l /
+l /
+# (novo bloco em paralelo)
+c /a/a/a/b3 d
+c /a/a/b/c3 d
+c /b/b/b/d3 d
+c /b/b/c/e3 d
+c /a/c/c/f3 d
+c /a/c/d/g3 d
+c /b/d/d/h3 d
+c /b/d/e/i3 d
+l /
+l /
+# (novo bloco em paralelo)
+c /a/a/a/b4 d
+c /a/a/b/c4 d
+c /b/b/b/d4 d
+c /b/b/c/e4 d
+c /a/c/c/f4 d
+c /a/c/d/g4 d
+c /b/d/d/h4 d
+c /b/d/e/i4 d
+l /
+l /
+# (novo bloco em paralelo)
+d /a/a/a/b3
+d /a/a/b/c3
+d /b/b/b/d3
+d /b/b/c/e3
+d /a/c/c/f3
+d /a/c/d/g3
+d /b/d/d/h3
+d /b/d/e/i3
+l /
+l /
+# (novo bloco em paralelo)
+d /a/a/a/b4
+d /a/a/b/c4
+d /b/b/b/d4
+d /b/b/c/e4
+d /a/c/c/f4
+d /a/c/d/g4
+d /b/d/d/h4
+d /b/d/e/i4
+l /
+l /

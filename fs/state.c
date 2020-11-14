@@ -41,6 +41,34 @@ void lock(int inumber, int flag) {
 	}
 }
 
+/* Given a flag, tries locks the respective lock.
+ * Input:
+ *  - inumber: the number of the inode that is going to be locked.
+ *  - flag: the flag that indicates the mode to lock (state.h). 
+ * Returns: SUCCESS or FAIL
+ */
+int trylock(int inumber, int flag) {
+    if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
+        printf("trylock: invalid inumber\n");
+        exit(EXIT_FAILURE);
+    }
+
+    /* Try locks for reading */
+	if (flag == RD) {
+		if (pthread_rwlock_tryrdlock(&inode_table[inumber].lock) == 0) {
+			return SUCCESS;
+		}
+	}
+    /* Try locks for writing */
+	else if (flag == WR) {
+		if(pthread_rwlock_trywrlock(&inode_table[inumber].lock) == 0) {
+			return SUCCESS;
+		}
+	}
+
+    return FAIL;
+}
+
 /* Given a flag, unlocks the respective lock.
  * Input:
  *  - inumber: the number of the inode that is going to be locked.
@@ -107,8 +135,9 @@ void inode_table_destroy() {
  * Returns:
  *  inumber: identifier of the new i-node, if successfully created
  *     FAIL: if an error occurs
+ * 
+ * Note: the inode created is locked when this function ends.
  */
-/* Note: the inode created is locked when this function ends. */
 int inode_create(type nType) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);

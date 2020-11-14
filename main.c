@@ -191,6 +191,13 @@ void processInput() {
                 if(insertCommand(line))
                     break;
                 return;
+
+            case 'm':
+                if(numTokens != 3)
+                    errorParse();
+                if(insertCommand(line))
+                    break;
+                return;
             
             case '#':
                 break;
@@ -255,9 +262,9 @@ void * applyCommands(void * ptr) {
             continue;
         }
         
-        char token, type;
-        char name[MAX_INPUT_SIZE];
-        int numTokens = sscanf(command, "%c %s %c", &token, name, &type);
+        char token;
+        char name[MAX_INPUT_SIZE], thirdArg[MAX_INPUT_SIZE];
+        int numTokens = sscanf(command, "%c %s %s", &token, name, thirdArg);
         free(command);
         
         if (numTokens < 2) {
@@ -268,7 +275,7 @@ void * applyCommands(void * ptr) {
         int searchResult;
         switch (token) {
             case 'c':
-                switch (type) {
+                switch (thirdArg[0]) {
                     case 'f':
                         printf("Create file: %s\n", name);
                         create(name, T_FILE);
@@ -293,6 +300,11 @@ void * applyCommands(void * ptr) {
                 printf("Delete: %s\n", name);
                 delete(name);
                 break;
+            case 'm':
+                printf("Move: %s To: %s\n", name, thirdArg);
+                /* Funcao de move r*/
+                break;
+
             default:{ /* error. */
                 fprintf(stderr, "Error: command to apply\n");
                 exit(EXIT_FAILURE);

@@ -1,0 +1,64 @@
+# Teste a deadlocks na implementação do comando 'move'
+# Empiricamente funciona bem com 2 a 4 tarefas
+# (aumentar o delay é desnecessário - testado com 5000000)
+#
+# Criar ficheiros de base
+c /a d
+c /c d
+c /e d
+# (Repetição para garantir que são criados)
+c /a d
+c /c d
+c /e d
+c /y f
+c /a/b d
+c /a/b2 f
+c /a/b3 f
+c /a/b4 f
+c /a/b5 f
+c /a/z f
+c /c/d d
+c /c/d2 f
+c /c/d3 f
+c /c/d4 f
+c /c/d5 f
+c /e/f d
+c /e/f2 d
+c /e/f3 d
+#
+# Deadlock entre duas tarefas
+# Estas operações devem ocorrer com sucesso
+m /a/b /c/b
+m /c/d /a/d
+m /a/b2 /c/b2
+m /c/d2 /a/d2
+#
+# Agora, testar que não tentamos navegar dentro de ficheiros
+c /x f
+# /!\ Isto deve falhar (mesmo com 1 tarefa) /!\
+c /x/y/w/z f
+#
+#
+# 3-way deadlock
+# Estas operações também devem ocorrer com sucesso
+m /a/b3 /e/b3
+m /e/f /c/f
+m /c/d3 /a/d3
+m /a/b4 /e/b4
+m /e/f2 /c/f2
+m /c/d4 /a/d4
+m /a/b5 /e/b5
+m /e/f3 /c/f3
+m /c/d5 /a/d5
+#
+## Self-deadlocks
+## Deadlocks dentro da própria tarefa (por causa dos dois argumentos)
+## Estas operações devem ocorrer com sucesso, e devem ser usados os locks apropriados -
+## devem usar locks de escrita para "/" e "/a", não de leitura
+#m /y /a/y
+#m /a/z /z
+##
+## Deteção de loops - /!\ estas operações devem falhar (mesmo com 1 tarefa) /!\
+#m /a /a/a
+#m /c /c/c
+#m /e /e/e

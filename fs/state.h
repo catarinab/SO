@@ -27,6 +27,8 @@
 
 #define RD 0 /* Used on lock function, when we want to close a lock for reading. */
 #define WR 1 /* Used on lock function, when we want to close a lock for writing. */
+#define TRY 2 /* Used on lock function, when we want to use a TryLock. */
+#define LOCK 3 /* Used on lock function, when we want to use a Lock. */
 
 /*
  * Contains the name of the entry and respective i-number
@@ -55,6 +57,7 @@ typedef struct inode_t {
 } inode_t;
 
 void lock(int inumber, int flag);
+int trylock(int inumber, int flag);
 void unlock(int inumber);
 void insert_delay(int cycles);
 void inode_table_init();
