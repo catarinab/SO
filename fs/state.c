@@ -12,13 +12,12 @@
 #include "state.h"
 #include "../tecnicofs-api-constants.h"
 
-/*inode_t inode_table[INODE_TABLE_SIZE];*/
+inode_t inode_table[INODE_TABLE_SIZE];
 
 /* Given a flag, locks the respective lock.
  * Input:
  *  - inumber: the number of the inode that is going to be locked.
- *  - flag: the flag that indicates which lock to lock (flag descriptions in 
- * operations.h). 
+ *  - flag: the flag that indicates the mode to lock (state.h). 
  */
 void lock(int inumber, int flag) {
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE) || (inode_table[inumber].nodeType == T_NONE)) {
@@ -26,13 +25,15 @@ void lock(int inumber, int flag) {
         exit(EXIT_FAILURE);
     }
 
-	if (flag == READLOCK) {
+    /* Locks for reading */
+	if (flag == RD) {
 		if (pthread_rwlock_rdlock(&inode_table[inumber].lock) != 0) {
 			fprintf(stderr, "Error: readwrite lock failed\n");
 			exit(EXIT_FAILURE);
 		}
 	}
-	else if (flag == WRITELOCK) {
+    /* Locks for writing */
+	else if (flag == WR) {
 		if( pthread_rwlock_wrlock(&inode_table[inumber].lock) != 0) {
 			fprintf(stderr, "Error: readwrite lock failed\n");
 			exit(EXIT_FAILURE);
@@ -43,8 +44,6 @@ void lock(int inumber, int flag) {
 /* Given a flag, unlocks the respective lock.
  * Input:
  *  - inumber: the number of the inode that is going to be locked.
- *  - flag: the flag that indicates which lock to unlock (flag descriptions in 
- * operations.h).
  */
 void unlock(int inumber) {
     if ((inumber < 0) || (inumber > INODE_TABLE_SIZE)) {
@@ -85,7 +84,6 @@ void inode_table_init() {
 /*
  * Releases the allocated memory for the i-nodes tables.
  */
-
 void inode_table_destroy() {
     for (int i = 0; i < INODE_TABLE_SIZE; i++) {
         if (inode_table[i].nodeType != T_NONE) {
@@ -110,14 +108,17 @@ void inode_table_destroy() {
  *  inumber: identifier of the new i-node, if successfully created
  *     FAIL: if an error occurs
  */
+/* Note: the inode created is locked when this function ends. */
 int inode_create(type nType) {
     /* Used for testing synchronization speedup */
     insert_delay(DELAY);
 
     for (int inumber = 0; inumber < INODE_TABLE_SIZE; inumber++) {
+        /* Tries to see if the current inumber is an option */
         if (pthread_rwlock_trywrlock(&inode_table[inumber].lock) != 0) {
 			continue;
 		}
+        /* Tries to see if the current inumber is an option */
         if (inode_table[inumber].nodeType == T_NONE) {
             inode_table[inumber].nodeType = nType;
 
@@ -135,6 +136,7 @@ int inode_create(type nType) {
 
             return inumber;
         }
+        /* If its not an option and we managed to lock it, unlocks it */
         if (pthread_rwlock_unlock(&inode_table[inumber].lock) != 0) {
 		    fprintf(stderr, "Error: readwrite unlock failed\n");
 		    exit(EXIT_FAILURE);

@@ -25,8 +25,8 @@
 
 #define DELAY 5000
 
-#define READLOCK 0
-#define WRITELOCK 1
+#define RD 0 /* Used on lock function, when we want to close a lock for reading. */
+#define WR 1 /* Used on lock function, when we want to close a lock for writing. */
 
 /*
  * Contains the name of the entry and respective i-number
@@ -53,8 +53,6 @@ typedef struct inode_t {
 	pthread_rwlock_t lock;
     /* more i-node attributes will be added in future exercises */
 } inode_t;
-
-inode_t inode_table[INODE_TABLE_SIZE];
 
 void lock(int inumber, int flag);
 void unlock(int inumber);
