@@ -25,6 +25,8 @@
 
 #define DELAY 5000
 
+#define READLOCK 0
+#define WRITELOCK 1
 
 /*
  * Contains the name of the entry and respective i-number

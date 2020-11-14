@@ -29,13 +29,6 @@ void addLockedInode(LockedInodes * locked_inodes, int inumber){
 void unlockLockedInodes(LockedInodes * locked_inodes){
 	for(int i = 0; i < locked_inodes->size; i++) {
 		unlock(locked_inodes->inumbers[i]);
-		if (pthread_rwlock_trywrlock(&inode_table[locked_inodes->inumbers[i]].lock) == 0) {
-			printf("unlocked %d hehehe\n", locked_inodes->inumbers[i]);
-			pthread_rwlock_unlock(&inode_table[locked_inodes->inumbers[i]].lock);
-		}
-		else {
-			printf("not unlocked %d oinc\n", locked_inodes->inumbers[i]);
-		}
 	}
 	free(locked_inodes->inumbers);
 }
@@ -162,11 +155,11 @@ int lookupAux(char *name, LockedInodes *locked_inodes, int flag) {
 	char *path = strtok_r(full_path, delim, &saveptr);
 
 	if (path == NULL && flag == MODIFY) {
-		lock(current_inumber, WRITE);
+		lock(current_inumber, WRITELOCK);
 	}
 	else {
 		/* get root inode data */
-		lock(current_inumber, READ);
+		lock(current_inumber, READLOCK);
 		inode_get(current_inumber, &nType, &data);
 	}
 	addLockedInode(locked_inodes, current_inumber);
@@ -176,10 +169,10 @@ int lookupAux(char *name, LockedInodes *locked_inodes, int flag) {
 		path = strtok_r(NULL, delim, &saveptr); 
 
 		if (path == NULL && flag == MODIFY) {
-			lock(current_inumber, WRITE);
+			lock(current_inumber, WRITELOCK);
 		}
 		else {
-			lock(current_inumber, READ);
+			lock(current_inumber, READLOCK);
 		}
 		addLockedInode(locked_inodes, current_inumber);
 
@@ -248,7 +241,7 @@ int create(char *name, type nodeType){
 
 
 	if (lookup_sub_node(child_name, pdata.dirEntries) != FAIL) {
-		printf("failed to create %s, already exists in dir %s\n",
+		printf("failed to create %s, alREADLOCKy exists in dir %s\n",
 		       child_name, parent_name);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
@@ -294,7 +287,10 @@ int delete(char *name){
 	strcpy(name_copy, name);
 	split_parent_child_from_path(name_copy, &parent_name, &child_name);
 
+
 	parent_inumber = lookupAux(parent_name, &locked_inodes, MODIFY);
+
+	printf("DELETE 3\n");
 	if (parent_inumber == FAIL) {
 		printf("failed to delete %s, invalid parent dir %s\n",
 		        child_name, parent_name);
@@ -318,7 +314,7 @@ int delete(char *name){
 		return FAIL;
 	}
 
-	lock(child_inumber, WRITE);
+	lock(child_inumber, WRITELOCK);
 	addLockedInode(&locked_inodes, child_inumber);
 	inode_get(child_inumber, &cType, &cdata);
 	if (cType == T_DIRECTORY && is_dir_empty(cdata.dirEntries) == FAIL) {

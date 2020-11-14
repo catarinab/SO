@@ -272,12 +272,10 @@ void * applyCommands(void * ptr) {
                     case 'f':
                         printf("Create file: %s\n", name);
                         create(name, T_FILE);
-                        printf("Creatou puta: %s.\n", name);
                         break;
                     case 'd':
                         printf("Create directory: %s\n", name);
                         create(name, T_DIRECTORY);
-                        printf("Creatou puta: %s.\n", name);
                         break;
                     default:
                         fprintf(stderr, "Error: invalid node type\n");
@@ -294,7 +292,6 @@ void * applyCommands(void * ptr) {
             case 'd':
                 printf("Delete: %s\n", name);
                 delete(name);
-                printf("Deletou puta: %s.\n", name);
                 break;
             default:{ /* error. */
                 fprintf(stderr, "Error: command to apply\n");

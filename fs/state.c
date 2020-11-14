@@ -26,13 +26,13 @@ void lock(int inumber, int flag) {
         exit(EXIT_FAILURE);
     }
 
-	if (flag == READ) {
+	if (flag == READLOCK) {
 		if (pthread_rwlock_rdlock(&inode_table[inumber].lock) != 0) {
 			fprintf(stderr, "Error: readwrite lock failed\n");
 			exit(EXIT_FAILURE);
 		}
 	}
-	else if (flag == WRITE) {
+	else if (flag == WRITELOCK) {
 		if( pthread_rwlock_wrlock(&inode_table[inumber].lock) != 0) {
 			fprintf(stderr, "Error: readwrite lock failed\n");
 			exit(EXIT_FAILURE);
