@@ -55,10 +55,10 @@ m /c/d5 /a/d5
 ## Deadlocks dentro da própria tarefa (por causa dos dois argumentos)
 ## Estas operações devem ocorrer com sucesso, e devem ser usados os locks apropriados -
 ## devem usar locks de escrita para "/" e "/a", não de leitura
-#m /y /a/y
-#m /a/z /z
+m /y /a/y
+m /a/z /z
 ##
 ## Deteção de loops - /!\ estas operações devem falhar (mesmo com 1 tarefa) /!\
-#m /a /a/a
-#m /c /c/c
-#m /e /e/e
+m /a /a/a
+m /c /c/c
+m /e /e/e

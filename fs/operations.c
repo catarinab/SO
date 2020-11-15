@@ -376,16 +376,11 @@ int delete(char *name) {
  * Returns: SUCCESS or FAIL
  */
 int included(char **table, char *path) {
-	printf("2.3\n");
-	printf("path: %s\n", path);
-	for(int i = 0; i < 4; i++){
-		printf("table[%d]: %s\n", i, table[i]);
+	for (int i = 0; i < 4; i++){
 		if (strcmp(table[i], path) == 0) {
-			printf("iguais\n");
 			return SUCCESS;
 		}
 	}
-	printf("falha\n");
 	return FAIL;
 }
 
@@ -400,7 +395,7 @@ int move(char *origin, char *destiny) {
 	/* esta operação só deve ser executada caso se verifiquem duas condições no 
 	 * momento em que é invocada: existe um ficheiro/diretoria com o pathname
 	 * atual e não existe nenhum ficheiro/diretoria com o novo pathname.
-	 * 1. guardar os dois trincos que são para leitura no writeDirectories.
+	 * 1. guardar os dois trincos que são para leitura no writeMode.
 	 * 2. verificar que existe um ficheiro/diretoria com o pathname do primeiro 
 	 * path. depois fazer os locks e se ele passar pelo trinco de escrita do outro 
 	 * path, dar lock.
@@ -409,54 +404,57 @@ int move(char *origin, char *destiny) {
 	 * inodes, continuar. se não. então largar os locks, fazer sleep, e depois 
 	 * tentar de novo.
 	 */
-	char delim[] = "/";
-	char *writeDirectories[4];
-	char *parent_name, *child_name_orig, *child_name_dest, *waste;
-	char origin_copy[MAX_FILE_NAME], destiny_copy[MAX_FILE_NAME];
-	char *saveptr_orig, *saveptr_dest, *origin_path, *destiny_path;
 
-	printf("1\n");
+	char *parent_name = NULL, *child_name_orig = NULL, *child_name_dest = NULL, *waste = NULL;
+	char origin_copy[MAX_FILE_NAME], destiny_copy[MAX_FILE_NAME];
+	int current_inumber, parent_inumber_orig, parent_inumber_dest, child_inumber;
+
+	/* use for strtok_r */
+	char delim[] = "/";
+	char *saveptr_orig = NULL, *saveptr_dest = NULL, *origin_path = NULL, *destiny_path = NULL;
 
 	/* use for copy */
 	type pType;
 	union Data pdata;
 
-	int current_inumber = FS_ROOT;
-	int parent_inumber_orig, parent_inumber_dest, child_inumber;
+	/* array of directories/files that have to be locked for writing */
+	char *writeMode[4];
 
+	/* locked inodes */
 	LockedInodes locked_inodes;
 	locked_inodes.inumbers = NULL;
 	locked_inodes.size = 0;
 
 	strcpy(origin_copy, origin);
 	strcpy(destiny_copy, destiny);
-	split_parent_child_from_path(origin_copy, &parent_name, &writeDirectories[0]);
-	split_parent_child_from_path(parent_name, &waste, &writeDirectories[1]);
-	split_parent_child_from_path(destiny_copy, &parent_name, &writeDirectories[2]);
-	split_parent_child_from_path(parent_name, &waste, &writeDirectories[3]);
+	split_parent_child_from_path(origin_copy, &parent_name, &writeMode[0]);
+	split_parent_child_from_path(parent_name, &waste, &writeMode[1]);
+	split_parent_child_from_path(destiny_copy, &parent_name, &writeMode[2]);
+	split_parent_child_from_path(parent_name, &waste, &writeMode[3]);
 	strcpy(origin_copy, origin);
 	strcpy(destiny_copy, destiny);
 
-	printf("2\n");
+	if (strcmp(writeMode[0], writeMode[3]) == 0 || 
+		strcmp(writeMode[2], writeMode[3]) == 0) {
+		printf("failed to move %s to %s\n: same folder.", origin, destiny);
+		return FAIL;
+	}
 
-	if (included(writeDirectories, "") == SUCCESS) {
-		printf("2.1\n");
+	current_inumber = FS_ROOT;
+	if (included(writeMode, "") == SUCCESS) {
 		lock(current_inumber, WR);
 	}
 	else {
-		printf("2.2\n");
 		lock(current_inumber, RD);
 	}
-	printf("3\n");
 	addLockedInode(&locked_inodes, current_inumber);
 	/* get root inode data */
 	inode_get(current_inumber, &pType, &pdata);
 
 	split_parent_child_from_path(origin_copy, &origin_path, &child_name_orig);
-	origin_path = strtok_r(origin_path, delim, &saveptr_dest);
-	printf("4\n");
+	origin_path = strtok_r(origin_path, delim, &saveptr_orig);
 	while (origin_path != NULL && (current_inumber = lookup_sub_node(origin_path, pdata.dirEntries)) != FAIL) {
-		if (included(writeDirectories, origin_path)) {
+		if (included(writeMode, origin_path) == SUCCESS) {
 			lock(current_inumber, WR);
 		}
 		else {
@@ -466,24 +464,27 @@ int move(char *origin, char *destiny) {
 		inode_get(current_inumber, &pType, &pdata);
 		origin_path = strtok_r(NULL, delim, &saveptr_orig); 
 	}
-	printf("5\n");
+	
 	if ((parent_inumber_orig = current_inumber) == FAIL || (child_inumber = lookup_sub_node(child_name_orig, pdata.dirEntries)) == FAIL) {
 		printf("failed to move, invalid origin path %s\n", origin);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-	printf("6\n");
+
+	current_inumber = FS_ROOT;
+	inode_get(current_inumber, &pType, &pdata);
+
 	split_parent_child_from_path(destiny_copy, &destiny_path, &child_name_dest);
 	destiny_path = strtok_r(destiny_path, delim, &saveptr_dest);
-	printf("7\n");
 	while (destiny_path != NULL && (current_inumber = lookup_sub_node(destiny_path, pdata.dirEntries)) != FAIL) {
-		if (!lockedInode(&locked_inodes, current_inumber)) {
-			if (included(writeDirectories, origin_path)) {
+		if (lockedInode(&locked_inodes, current_inumber) != SUCCESS) {
+			if (included(writeMode, destiny_path) == SUCCESS) {
 				if (trylock(current_inumber, WR) == FAIL) {
 					unlockLockedInodes(&locked_inodes);
 					sleep((double)rand() / (double)RAND_MAX);
 					return GIVEUP;
 				}
+				
 			}
 			else {
 				if (trylock(current_inumber, RD) == FAIL) {
@@ -497,22 +498,18 @@ int move(char *origin, char *destiny) {
 		inode_get(current_inumber, &pType, &pdata);
 		destiny_path = strtok_r(NULL, delim, &saveptr_dest);
 	}
-	printf("8\n");
+	
 	if ((parent_inumber_dest = current_inumber) == FAIL || (lookup_sub_node(child_name_dest, pdata.dirEntries)) != FAIL) {
-		printf("failed to move, invalid origin path %s\n", origin);
+		printf("failed to move, invalid destiny path %s\n", origin);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-
-	printf("9\n");
 
 	if (dir_reset_entry(parent_inumber_orig, child_inumber) == FAIL) {
 		printf("failed to move %s to %s\n", origin, destiny);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
-
-	printf("10\n");
 
 	if (dir_add_entry(parent_inumber_dest, child_inumber, child_name_dest) == FAIL) {
 		dir_add_entry(parent_inumber_orig, child_inumber, child_name_orig);
@@ -521,12 +518,8 @@ int move(char *origin, char *destiny) {
 		return FAIL;
 	}
 
-	printf("11\n");
-
 	unlockLockedInodes(&locked_inodes);
-
-	printf("12\n");
-
+	
 	return SUCCESS;
 }
 

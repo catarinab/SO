@@ -10,5 +10,3 @@ c h f
 l c
 d c
 l c
-
-m a/b/c/d e/f/g
