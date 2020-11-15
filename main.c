@@ -302,9 +302,7 @@ void * applyCommands(void * ptr) {
                 break;
             case 'm':            
                 printf("Move: %s To: %s\n", name, thirdArg);
-                while ((commandResult = move(name, thirdArg)) == GIVEUP){
-                    printf("GIVEUP\n");
-                }
+                while ((commandResult = move(name, thirdArg)) == GIVEUP);
                 if(commandResult == SUCCESS)
                     printf("Move: %s To: %s successful.\n", name, thirdArg);
                 else
