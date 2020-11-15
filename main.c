@@ -272,7 +272,7 @@ void * applyCommands(void * ptr) {
             exit(EXIT_FAILURE);
         }
 
-        int searchResult;
+        int commandResult;
         switch (token) {
             case 'c':
                 switch (thirdArg[0]) {
@@ -290,8 +290,8 @@ void * applyCommands(void * ptr) {
                 }
                 break;
             case 'l':
-                searchResult = lookup(name);
-                if (searchResult >= 0)
+                commandResult = lookup(name);
+                if (commandResult >= 0)
                     printf("Search: %s found\n", name);
                 else
                     printf("Search: %s not found\n", name);
@@ -300,11 +300,16 @@ void * applyCommands(void * ptr) {
                 printf("Delete: %s\n", name);
                 delete(name);
                 break;
-            case 'm':
+            case 'm':            
                 printf("Move: %s To: %s\n", name, thirdArg);
-                /* Funcao de move r*/
+                while ((commandResult = move(name, thirdArg)) == GIVEUP){
+                    printf("GIVEUP\n");
+                }
+                if(commandResult == SUCCESS)
+                    printf("Move: %s To: %s successful.\n", name, thirdArg);
+                else
+                    printf("Move: %s To: %s failed.\n", name, thirdArg);
                 break;
-
             default:{ /* error. */
                 fprintf(stderr, "Error: command to apply\n");
                 exit(EXIT_FAILURE);

@@ -1,6 +1,6 @@
 # 8 creates, 2 lookups, 1 delete
 c a f
-c b f
+c b d
 c c f
 c d f
 c e f
@@ -10,4 +10,4 @@ c h f
 l c
 d c
 l c
-m a b
+m a b/c
