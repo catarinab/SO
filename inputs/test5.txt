@@ -25,6 +25,10 @@ c /c/d5 f
 c /e/f d
 c /e/f2 d
 c /e/f3 d
+c /ola d
+c /ola/b d
+c /ola/b/d d
+c /ola/b/c d
 #
 # Deadlock entre duas tarefas
 # Estas operações devem ocorrer com sucesso
@@ -62,3 +66,4 @@ m /a/z /z
 m /a /a/a
 m /c /c/c
 m /e /e/e
+m /ola/b/c /ola/b/c/d

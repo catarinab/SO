@@ -434,12 +434,6 @@ int move(char *origin, char *destiny) {
 	split_parent_child_from_path(destiny_copy1, &parent_name, &writeMode[2]);
 	split_parent_child_from_path(parent_name, &waste, &writeMode[3]);
 
-	if (strcmp(writeMode[0], writeMode[3]) == 0 || 
-		strcmp(writeMode[2], writeMode[3]) == 0) {
-		printf("Failed to move %s to %s: same folder.\n", origin, destiny);
-		return FAIL;
-	}
-
 	current_inumber = FS_ROOT;
 	if (included(writeMode, "") == SUCCESS) {
 		lock(current_inumber, WR);
@@ -466,7 +460,6 @@ int move(char *origin, char *destiny) {
 		inode_get(current_inumber, &pType, &pdata);
 		origin_path = strtok_r(NULL, delim, &saveptr_orig); 
 	}
-	
 	if ((parent_inumber_orig = current_inumber) == FAIL || (child_inumber = lookup_sub_node(child_name_orig, pdata.dirEntries)) == FAIL) {
 		printf("failed to move, invalid origin path %s\n", origin);
 		unlockLockedInodes(&locked_inodes);
@@ -502,9 +495,15 @@ int move(char *origin, char *destiny) {
 		inode_get(current_inumber, &pType, &pdata);
 		destiny_path = strtok_r(NULL, delim, &saveptr_dest);
 	}
-	
 	if ((parent_inumber_dest = current_inumber) == FAIL || (lookup_sub_node(child_name_dest, pdata.dirEntries)) != FAIL) {
-		printf("failed to move, invalid destiny path %s\n", origin);
+		printf("failed to move, invalid destiny path %s\n", destiny);
+		unlockLockedInodes(&locked_inodes);
+		return FAIL;
+	}
+
+	/* checks if move makes sense */
+	if (lockedInode(&locked_inodes, child_inumber) == SUCCESS) {
+		printf("failed to move %s to %s\n", origin, destiny);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}

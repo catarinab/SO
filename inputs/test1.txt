@@ -1,5 +1,6 @@
 # 8 creates, 2 lookups, 1 delete
 c a f
+c a/b f
 c b f
 c c f
 c d f
@@ -10,3 +11,4 @@ c h f
 l c
 d c
 l c
+m /a /a/b
