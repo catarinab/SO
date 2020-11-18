@@ -370,17 +370,17 @@ int delete(char *name) {
 }
 
 /*
- * Moves a node given an source path and a destiny path.
+ * Moves a node given a source path and a destiny path.
  * Input:
- *  - source: path of node
- *  - destiny: future path of node
+ *  - source: path of the node to move.
+ *  - destiny: future path of the node.
  * Returns: SUCCESS or FAIL
  */
 int move(char *source, char *destiny) {
 	/* esta operação só deve ser executada caso se verifiquem duas condições no 
 	 * momento em que é invocada: existe um ficheiro/diretoria com o pathname
 	 * atual e não existe nenhum ficheiro/diretoria com o novo pathname.
-	 * 1. guardar os dois trincos que são para leitura no writeMode.
+	 * 1. guardar os dois trincos que são para escrita no writeMode.
 	 * 2. verificar que existe um ficheiro/diretoria com o pathname do primeiro 
 	 * path. depois fazer os locks e se ele passar pelo trinco de escrita do outro 
 	 * path, dar lock.
@@ -413,14 +413,16 @@ int move(char *source, char *destiny) {
 
 	/* stores in writeMode the nodes that have to be locked for writing */
 	strcpy(source_copy, source);
-	strcpy(destiny_copy, destiny);
 	split_parent_child_from_path(source_copy, &buffer1, &buffer2);
 	split_parent_child_from_path(buffer1, &buffer2, &buffer3);
-	strcpy(writeMode[0], buffer3);
-	split_parent_child_from_path(destiny_copy, &buffer1, &buffer1);
-	split_parent_child_from_path(buffer1, &buffer3, &buffer1);
-	strcpy(writeMode[0], buffer3);
+	writeMode[0] = strdup(buffer3);
 
+	strcpy(destiny_copy, destiny);
+	split_parent_child_from_path(destiny_copy, &buffer1, &buffer2);
+	split_parent_child_from_path(buffer1, &buffer2, &buffer3);
+	writeMode[1] = strdup(buffer3);
+
+	/* locks the root */
 	current_inumber = FS_ROOT;
 	if (strcmp("", writeMode[0]) == 0 || strcmp("", writeMode[1]) == 0) {
 		lock(current_inumber, WR);
@@ -450,6 +452,8 @@ int move(char *source, char *destiny) {
 	if ((parent_inumber_src = current_inumber) == FAIL || 
 		(child_inumber = lookup_sub_node(child_name_src, pdata.dirEntries)) == FAIL) {
 		printf("failed to move, invalid source path %s\n", source);
+		free(writeMode[0]);
+		free(writeMode[1]);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
@@ -466,6 +470,8 @@ int move(char *source, char *destiny) {
 		if (lockedInode(&locked_inodes, current_inumber) != SUCCESS) {
 			if (strcmp(path, writeMode[0]) == 0 || strcmp(path, writeMode[1]) == 0) {
 				if (trylock(current_inumber, WR) == FAIL) {
+					free(writeMode[0]);
+					free(writeMode[1]);
 					unlockLockedInodes(&locked_inodes);
 					sleep((double)rand() / (double)RAND_MAX);
 					return GIVEUP;
@@ -473,6 +479,8 @@ int move(char *source, char *destiny) {
 			}
 			else {
 				if (trylock(current_inumber, RD) == FAIL) {
+					free(writeMode[0]);
+					free(writeMode[1]);
 					unlockLockedInodes(&locked_inodes);
 					sleep((double)rand() / (double)RAND_MAX);
 					return GIVEUP;
@@ -486,9 +494,14 @@ int move(char *source, char *destiny) {
 	if ((parent_inumber_dest = current_inumber) == FAIL || 
 		(lookup_sub_node(child_name_dest, pdata.dirEntries)) != FAIL) {
 		printf("failed to move, invalid destiny path %s\n", destiny);
+		free(writeMode[0]);
+		free(writeMode[1]);
 		unlockLockedInodes(&locked_inodes);
 		return FAIL;
 	}
+
+	free(writeMode[0]);
+	free(writeMode[1]);
 
 	/* checks if move makes sense */
 	if (lockedInode(&locked_inodes, child_inumber) == SUCCESS) {
