@@ -427,6 +427,8 @@ int main(int argc, char* argv[]) {
     /* Starts counting the time. */
     gettimeofday(&tick, NULL);
 
+    
+
     parallelization();
 
     /* End of counting the time and print of the result. */
