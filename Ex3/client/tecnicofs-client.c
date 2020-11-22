@@ -6,7 +6,7 @@
 FILE* inputFile;
 char* serverName;
 
-static void displayUsage (const char* appName) {
+/*static void displayUsage (const char* appName) {
     printf("Usage: %s inputfile server_socket_name\n", appName);
     exit(EXIT_FAILURE);
 }
@@ -42,7 +42,7 @@ void *processInput() {
 
         int numTokens = sscanf(line, "%c %s %s", &op, arg1, arg2);
 
-        /* perform minimal validation */
+        perform minimal validation 
         if (numTokens < 1) {
             continue;
         }
@@ -100,7 +100,7 @@ void *processInput() {
                 break;
             case '#':
                 break;
-            default: { /* error */
+            default: { error
                 errorParse();
             }
         }
@@ -108,9 +108,11 @@ void *processInput() {
     fclose(inputFile);
     return NULL;
 }
+*/
 
 int main(int argc, char* argv[]) {
-    parseArgs(argc, argv);
+    /* parseArgs(argc, argv); */
+    serverName = "/home/catarina/Desktop/uni/2-ano/2-ano-1-semestre/SO/Projetos/Ex3/datagramServidor";
 
     if (tfsMount(serverName) == 0)
       printf("Mounted! (socket = %s)\n", serverName);
@@ -119,7 +121,15 @@ int main(int argc, char* argv[]) {
       exit(EXIT_FAILURE);
     }
 
-    processInput();
+    char *message = "Hello World";
+    if (tfsCreate(message) == 0)
+        printf("Message sent! (message = %s)\n", message);
+    else {
+        fprintf(stderr, "Unable to send message: %s\n", message);
+      exit(EXIT_FAILURE);
+    }
+
+    /* processInput(); */
 
     tfsUnmount();
 

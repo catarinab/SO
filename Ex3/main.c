@@ -12,10 +12,21 @@
 #include <ctype.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/un.h>
+#include <sys/uio.h>
+#include <unistd.h>
+#include <sys/stat.h>
 #include "fs/operations.h"
 
 #define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
+
+/* Sockets */
+#define INDIM 30
+#define OUTDIM 512
+#define SOCKETSERVIDOR "datagramServidor"
 
 /* Variables that store the arguments from the server call. */
 int numberThreads;
@@ -406,11 +417,75 @@ void parallelization() {
     destroySynch();
 }
 
+/* Sets up socket.
+ * Input:
+ *  - path: path of the socket.
+ *  - addr: socket address.
+ * Returns:
+ *  - Lenght of the socket address.
+ */
+int setSockAddrUn(char *path, struct sockaddr_un *addr) {
+
+    if (addr == NULL)
+        return 0;
+
+    bzero((char *)addr, sizeof(struct sockaddr_un));
+    addr->sun_family = AF_UNIX;
+    strcpy(addr->sun_path, path);
+
+    return SUN_LEN(addr);
+}
+
+/* Initializes the sockets, and works with them.
+ */
+void sockets() {
+    int sockfd;
+    struct sockaddr_un server_addr;
+    socklen_t addrlen;
+    char *path;
+
+    if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
+        perror("server: can't open socket");
+        exit(EXIT_FAILURE);
+    }
+
+    path = SOCKETSERVIDOR;
+
+    unlink(path);
+
+    addrlen = setSockAddrUn(SOCKETSERVIDOR, &server_addr);
+    if (bind(sockfd, (struct sockaddr *) &server_addr, addrlen) < 0) {
+        perror("server: bind error");
+        exit(EXIT_FAILURE);
+    }
+
+    while (1) {
+        struct sockaddr_un client_addr;
+        char in_buffer[INDIM];
+        int c;
+
+        addrlen = sizeof(struct sockaddr_un);
+        c = recvfrom(sockfd, in_buffer, sizeof(in_buffer)-1, 0,
+            (struct sockaddr *)&client_addr, &addrlen);
+        if (c <= 0) continue;
+        //Preventivo, caso o cliente nao tenha terminado a mensagem em '\0', 
+        in_buffer[c]='\0';
+        
+        printf("Recebeu mensagem de %s: %s\n", client_addr.sun_path, in_buffer);
+    }
+
+    /* Fechar e apagar o nome do socket, apesar deste programa */
+    /* nunca chegar a este ponto */
+    close(sockfd);
+    unlink(SOCKETSERVIDOR);
+}
+
+
 /* Main.
  */
 int main(int argc, char* argv[]) {
-    struct timeval tick, tock;
-    double time;
+    /* struct timeval tick, tock;
+    double time; */
 
     /* Initializes global variables. */
     numCommands = 0;
@@ -421,27 +496,27 @@ int main(int argc, char* argv[]) {
     /* Initializes filesystem. */
     init_fs();
 
-    /* Processes argurments from server call. */
+    sockets();
+
+    /* Processes argurments from server call.
     processArgs(argc, argv);
 
-    /* Starts counting the time. */
+    Starts counting the time.
     gettimeofday(&tick, NULL);
-
-    
 
     parallelization();
 
-    /* End of counting the time and print of the result. */
+    End of counting the time and print of the result. 
     gettimeofday(&tock, NULL);
     time = (tock.tv_sec - tick.tv_sec); 
     time = ((time * 1e6) + (tock.tv_usec - tick.tv_usec)) * 1e-6;
     printf("TecnicoFS completed in %.4f seconds.\n", time);
 
-    /* Prints tree to the output file. */
+    Prints tree to the output file. 
     print_tecnicofs_tree(outputFile);
-    fclose(outputFile);
+    fclose(outputFile); */
 
     /* Releases allocated memory. */
-    destroy_fs();
+    destroy_fs(); 
     exit(EXIT_SUCCESS);
 }
