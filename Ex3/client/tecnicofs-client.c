@@ -126,7 +126,7 @@ int main(int argc, char* argv[]) {
         printf("Message sent! (message = %s)\n", message);
     else {
         fprintf(stderr, "Unable to send message: %s\n", message);
-      exit(EXIT_FAILURE);
+        exit(EXIT_FAILURE);
     }
 
     /* processInput(); */

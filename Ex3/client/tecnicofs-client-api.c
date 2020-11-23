@@ -45,7 +45,7 @@ int tfsLookup(char *path) {
 }
 
 int tfsMount(char * sockPath) {  
-  servname = sockPath;
+  servname = strdup(sockPath);
 
   if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0) ) < 0) {
     perror("client: can't open socket");
@@ -66,6 +66,7 @@ int tfsMount(char * sockPath) {
 
 int tfsUnmount() {
   close(sockfd);
+  free(servname);
   unlink(SOCKETCLIENTE);
 
   return 0;
