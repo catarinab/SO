@@ -52,7 +52,7 @@ int sendCommand(char * command){
 
   if (recvfrom(sockfd, &res, sizeof(int), 0, 0, 0) < 0) {
     perror("client: recvfrom error");
-    exit(EXIT_FAILURE);
+    return FAIL;
   }
   
   return res;
@@ -86,6 +86,13 @@ int tfsMove(char *from, char *to) {
 int tfsLookup(char *path) {
   char * message = strdup("l ");
   strcat(message, path);
+
+  return sendCommand(message);
+}
+
+int tfsPrint(char * fileName){
+  char * message = strdup("p ");
+  strcat(message, fileName);
 
   return sendCommand(message);
 }

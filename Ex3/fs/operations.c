@@ -531,6 +531,20 @@ int move(char *source, char *destiny) {
 }
 
 /*
+ * Executes the "p" command, prints tecnicofs tree.
+ * Input:
+ *  - outputFile: file where the tree is printed.
+ * Returns: SUCCESS or FAIL
+ */
+int printOperations(FILE * outputFile) {
+	lock(FS_ROOT, WR);
+	print_tecnicofs_tree(outputFile);
+	unlock(FS_ROOT);
+
+	return SUCCESS;
+}
+
+/*
  * Prints tecnicofs tree.
  * Input:
  *  - fp: pointer to output file

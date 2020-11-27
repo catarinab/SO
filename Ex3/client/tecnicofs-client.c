@@ -1,3 +1,10 @@
+/* 
+ * (Ficheiro alterado)
+ * Grupo 27:
+ * 93230 Catarina Bento
+ * 94179 Luis Freire D'Andrade
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,6 +103,15 @@ void *processInput() {
                   printf("Moved: %s to %s\n", arg1, arg2);
                 else
                   printf("Unable to move: %s to %s\n", arg1, arg2);
+                break;
+            case 'p':
+                if(numTokens != 2)
+                    errorParse();
+                res = tfsPrint(arg1);
+                if (!res)
+                  printf("Print Tecnico FS Tree successful.\n");
+                else
+                  printf("Print Tecnico FS Tree Failed.\n");
                 break;
             case '#':
                 break;

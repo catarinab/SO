@@ -8,6 +8,7 @@ c e f
 c f f
 c g f
 c h f 
+p ola.txt
 l c
 d c
 l c

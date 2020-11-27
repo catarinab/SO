@@ -24,8 +24,6 @@
 
 /* Variables that store the arguments from the server call. */
 int numberThreads;
-FILE * inputFile;
-FILE * outputFile;
 
 /* Server socket. */
 char *socketPath;
@@ -112,6 +110,16 @@ int applyCommand(char * command) {
                 printf("Move: %s To: %s successful.\n", name, thirdArg);
             else
                 printf("Move: %s To: %s failed.\n", name, thirdArg);
+            break;
+        case 'p':
+            printf("Print Tecnico FS Tree\n");
+            /* Opens output file. */
+            FILE * outputFile;
+            if (!(outputFile = fopen(name, "w"))) {
+                fprintf(stderr, "Error: couldn't open output file\n");
+                exit(EXIT_FAILURE);
+            }
+            commandResult = printOperations(outputFile);
             break;
         default:{ /* error. */
             fprintf(stderr, "Error: command to apply\n");
@@ -220,10 +228,6 @@ int main(int argc, char* argv[]) {;
     socketInit();
 
     parallelization();
-
-    /* Prints tree to the output file. */
-    print_tecnicofs_tree(outputFile);
-    fclose(outputFile);
 
     /* Fechar e apagar o nome do socket, apesar deste programa nunca chegar a este ponto */
     close(sockfd);
