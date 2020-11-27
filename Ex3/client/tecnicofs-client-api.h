@@ -3,9 +3,11 @@
 
 #include "tecnicofs-api-constants.h"
 
-#define SOCKETCLIENTE "datagramCliente"
+#define SOCKETCLIENTE "/tmp/client"
+#define SUCCESS 0
+#define FAIL -1
 
-int tfsCreate(char * message);
+int tfsCreate(char *filename, char nodeType);
 int tfsDelete(char *path);
 int tfsLookup(char *path);
 int tfsMove(char *from, char *to);

@@ -20,48 +20,18 @@
 #include <sys/stat.h>
 #include "fs/operations.h"
 
-#define MAX_COMMANDS 10
 #define MAX_INPUT_SIZE 100
-
-/* Sockets */
-#define INDIM 30
-#define OUTDIM 512
 
 /* Variables that store the arguments from the server call. */
 int numberThreads;
 FILE * inputFile;
 FILE * outputFile;
 
-/* Variables needed for the program. */
-char inputCommands[MAX_COMMANDS][MAX_INPUT_SIZE];
-int numCommands, produceIndex, consumeIndex, eof;
-
 /* Server socket. */
 char *socketPath;
 int sockfd;
 struct sockaddr_un server_addr;
 socklen_t addrlen;
-
-/* Mutexes. */
-pthread_mutex_t lock_commands, lock_numCommands, lock_consumeIndex;
-
-/* Locks the respective lock.
- */
-void lockCommands(pthread_mutex_t * lock) {
-    if (pthread_mutex_lock(lock) != 0) {
-		fprintf(stderr, "Error: readwrite lock failed\n");
-		exit(EXIT_FAILURE);
-    }
-}
-
-/* Unlocks the respective lock.
- */
-void unlockCommands(pthread_mutex_t * lock) {
-    if (pthread_mutex_unlock(lock) != 0) {
-		fprintf(stderr, "Error: readwrite lock failed\n");
-		exit(EXIT_FAILURE);
-    }
-}
 
 /* Processes the arguments from server call.
  * Input:
@@ -85,62 +55,6 @@ void processArgs(int argc, char * argv[]) {
     socketPath = strdup(argv[2]);
 }
 
-/* Inserts a valid command in inputCommands, and returns if it was successful.
- * Input:
- *  - data: line from the input file.
- * Returns:
- *  - Integer that represents the success of the function call.
- */
-int insertCommand(char* data) {
-    lockCommands(&lock_numCommands);
-
-    strcpy(inputCommands[produceIndex], data);
-    produceIndex = (produceIndex + 1) % MAX_COMMANDS;
-    numCommands++;
-
-    unlockCommands(&lock_numCommands);
-
-    return 1;
-}
-
-/* Returns a boolean that represents if the global variable numberCommands is 
- * equal to a number. 
- * Input:
- *  - comparee: the number comparing to.
- */
-int numCommandsEquals(int comparee) {
-    lockCommands(&lock_numCommands);
-    int result = (numCommands == comparee);
-    unlockCommands(&lock_numCommands);
-
-    return result;
-}
-
-/* Removes a command from inputCommands.
- * Returns:x«    
- *  - The command that was removed.
- */
-char* removeCommand() {
-    if (numCommandsEquals(0)) {
-        return NULL;
-    }
-
-    lockCommands(&lock_numCommands);
-    lockCommands(&lock_consumeIndex);
-
-    int head = consumeIndex;
-    consumeIndex = (consumeIndex + 1) % MAX_COMMANDS;
-    numCommands--;
-    /* Copy of the command */
-    char *command = (char *) malloc(sizeof(char) * (strlen(inputCommands[head]) + 1));
-    strcpy(command, inputCommands[head]);
-
-    unlockCommands(&lock_numCommands);
-    unlockCommands(&lock_consumeIndex);
-
-    return command;
-}
-
 /* Throws an error when a command is invalid.
  */
 void errorParse() {
@@ -148,17 +62,15 @@ void errorParse() {
     exit(EXIT_FAILURE);
 }
 
-/* Applies the commands in inputCommands.
+/* Applies a command.
  * Input:
- *  - ptr: pointer to arguments (needed because this function is used by threads).
- * Returns:
- *  - Pointer to results (needed because this function is used by threads).
+ *  - command: command to apply.
+ * Returns: SUCCESS or FAIL
  */
-int applyCommands(char * command) {
+int applyCommand(char * command) {
     char token;
     char name[MAX_INPUT_SIZE], thirdArg[MAX_INPUT_SIZE];
     int numTokens = sscanf(command, "%c %s %s", &token, name, thirdArg);
-    free(command);
     
     if (numTokens < 2) {
         fprintf(stderr, "Error: invalid command in Queue\n");
@@ -209,55 +121,40 @@ int applyCommands(char * command) {
     return commandResult;
 }
 
-/* Initializes all the locks and conditional variables needed.
+/* Receives messages from a client's socket with commands to apply (used by threads).
+ * Input:
+ *  - args: pointer to arguments (needed because this function is used by threads).
+ * Returns:
+ *  - Pointer to results (needed because this function is used by threads).
  */
-void initSynch() {
-    /* command's lock. */
-    if (pthread_mutex_init(&lock_commands, NULL) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
-        exit(EXIT_FAILURE);
+void * receiveInput(void *args){
+    while (1) {
+        struct sockaddr_un client_addr;
+        char in_buffer[MAX_INPUT_SIZE];
+        int c, res;
+
+        addrlen = sizeof(struct sockaddr_un);
+        c = recvfrom(sockfd, in_buffer, sizeof(in_buffer)-1, 0,
+            (struct sockaddr *)&client_addr, &addrlen);
+        if (c <= 0) continue;
+        //Preventivo, caso o cliente nao tenha terminado a mensagem em '\0', 
+        in_buffer[c]='\0';
+        
+        printf("Recebeu mensagem de %s: %s.\n", client_addr.sun_path, in_buffer);
+
+        res = applyCommand(in_buffer);
+    
+        sendto(sockfd, &res, sizeof(int), 0, (struct sockaddr *)&client_addr, addrlen);
     }
-    /* numCommand's lock. */
-    if (pthread_mutex_init(&lock_numCommands, NULL) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
-        exit(EXIT_FAILURE);
-    }
-    /* consumeIndex's lock. */
-    if (pthread_mutex_init(&lock_consumeIndex, NULL) != 0) {
-        fprintf(stderr, "Error: mutex lock initialization failed\n");
-        exit(EXIT_FAILURE);
-    }
+    return NULL;
 }
 
-/* Destroys all the locks and conditional variables created.
- */
-void destroySynch() {
-    /* Commands lock. */
-    if (pthread_mutex_destroy(&lock_commands)!= 0) {
-        fprintf(stderr, "Error: mutex lock destruction failed\n");
-        exit(EXIT_FAILURE);  
-    }
-    /* numCommand's lock. */
-    if (pthread_mutex_destroy(&lock_numCommands) != 0) {
-        fprintf(stderr, "Error: mutex lock destruction failed\n");
-        exit(EXIT_FAILURE);
-    }
-    /* consumeIndex's lock. */
-    if (pthread_mutex_destroy(&lock_consumeIndex) != 0) {
-        fprintf(stderr, "Error: mutex lock destruction failed\n");
-        exit(EXIT_FAILURE);
-    }
-
-}
-
-/* Initializes the locks and condition variablrs, and creates the threads. Then, 
- * it waits for the threads to join and destroys the locks.
+/* Initializes the locks and creates the threads. Then, it waits for the threads 
+ * to join and destroys the locks.
  */
 void parallelization() {
     int i;
     pthread_t tid[numberThreads];
-
-    initSynch();
 
     for (i = 0; i < numberThreads; i++) {
         if (pthread_create(&tid[i], NULL, receiveInput, NULL) != 0) {
@@ -272,11 +169,9 @@ void parallelization() {
             exit(EXIT_FAILURE);
         }
     }
-
-    destroySynch();
 }
 
-/* Sets up socket.
+/* Sets up a socket.
  * Input:
  *  - path: path of the socket.
  *  - addr: socket address.
@@ -294,29 +189,7 @@ int setSockAddrUn(char *path, struct sockaddr_un *addr) {
     return SUN_LEN(addr);
 }
 
-void * receiveInput(void *args){
-    while (1) {
-        struct sockaddr_un client_addr;
-        char in_buffer[INDIM], out_buffer[OUTDIM];
-        int c, commandResult;
-
-        addrlen = sizeof(struct sockaddr_un);
-        c = recvfrom(sockfd, in_buffer, sizeof(in_buffer)-1, 0,
-            (struct sockaddr *)&client_addr, &addrlen);
-        if (c <= 0) continue;
-        //Preventivo, caso o cliente nao tenha terminado a mensagem em '\0', 
-        in_buffer[c]='\0';
-        
-        printf("Recebeu mensagem de %s: %s.\n", client_addr.sun_path, in_buffer);
-
-        commandResult = applyCommands(in_buffer);
-    
-        sendto(sockfd, &commandResult, sizeof(int), 0, (struct sockaddr *)&client_addr, addrlen);
-    }
-    return NULL;
-}
-
-/* Initializes the sockets, and works with them.
+/* Initializes the server's socket.
  */
 void socketInit() {
     if ((sockfd = socket(AF_UNIX, SOCK_DGRAM, 0)) < 0) {
@@ -343,7 +216,7 @@ int main(int argc, char* argv[]) {;
     /* Processes argurments from server call. */
     processArgs(argc, argv);
 
-    /* Initializes the*/
+    /* Initializes the server's socket. */
     socketInit();
 
     parallelization();

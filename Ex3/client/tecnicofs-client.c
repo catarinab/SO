@@ -1,12 +1,13 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "tecnicofs-client-api.h"
 #include "../tecnicofs-api-constants.h"
 
 FILE* inputFile;
 char* serverName;
 
-/*static void displayUsage (const char* appName) {
+static void displayUsage (const char* appName) {
     printf("Usage: %s inputfile server_socket_name\n", appName);
     exit(EXIT_FAILURE);
 }
@@ -17,14 +18,13 @@ static void parseArgs (long argc, char* const argv[]) {
         displayUsage(argv[0]);
     }
 
-    serverName = argv[2];
-
-    inputFile = fopen(argv[1], "r");
-
-    if (inputFile== NULL) {
+    if ((inputFile = fopen(argv[1], "r"))== NULL) {
         fprintf(stderr, "Error: cannot open input file\n");
         exit(EXIT_FAILURE);
     }
+
+    serverName = strdup(argv[2]);
+
 }
 
 void errorParse(){
@@ -42,7 +42,6 @@ void *processInput() {
 
         int numTokens = sscanf(line, "%c %s %s", &op, arg1, arg2);
 
-        perform minimal validation 
         if (numTokens < 1) {
             continue;
         }
@@ -100,7 +99,7 @@ void *processInput() {
                 break;
             case '#':
                 break;
-            default: { error
+            default: {
                 errorParse();
             }
         }
@@ -108,30 +107,23 @@ void *processInput() {
     fclose(inputFile);
     return NULL;
 }
-*/
 
 int main(int argc, char* argv[]) {
-    /* parseArgs(argc, argv); */
-    serverName = "/home/catarina/Desktop/uni/2-ano/2-ano-1-semestre/SO/Projetos/Ex3/datagramServidor";
+    parseArgs(argc, argv);
 
-    if (tfsMount(serverName) == 0)
-      printf("Mounted! (socket = %s)\n", serverName);
-    else {
-      fprintf(stderr, "Unable to mount socket: %s\n", serverName);
-      exit(EXIT_FAILURE);
+    if (tfsMount(serverName) == 0) {
+        printf("Mounted! (socket = %s)\n", serverName);
     }
-
-    char *message = "Hello World";
-    if (tfsCreate(message) == 0)
-        printf("Message sent! (message = %s)\n", message);
     else {
-        fprintf(stderr, "Unable to send message: %s\n", message);
+        fprintf(stderr, "Unable to mount socket: %s\n", serverName);
         exit(EXIT_FAILURE);
     }
 
-    /* processInput(); */
+    processInput();
 
     tfsUnmount();
+
+    free(serverName);
 
     exit(EXIT_SUCCESS);
 }
