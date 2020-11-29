@@ -1,5 +1,5 @@
 # 8 creates, 2 lookups, 1 delete
-c a f
+c a d
 c a/b f
 c b f
 c c f
@@ -8,7 +8,7 @@ c e f
 c f f
 c g f
 c h f 
-p ola.txt
+p /home/catarina/Desktop/uni/2-ano/2-ano-1-semestre/SO/Projetos/Ex3/sim.txt
 l c
 d c
 l c

@@ -31,6 +31,11 @@ int sockfd;
 struct sockaddr_un server_addr;
 socklen_t addrlen;
 
+static void displayUsage (const char* appName) {
+    printf("Usage: %s numberThreads socket_name\n", appName);
+    exit(EXIT_FAILURE);
+}
+
 /* Processes the arguments from server call.
  * Input:
  *  - argc: number of arguments.
@@ -39,8 +44,7 @@ socklen_t addrlen;
 void processArgs(int argc, char * argv[]) {
     /* Verifies number of arguments. */
     if (argc != 3) {
-        fprintf(stderr, "Error: invalid number of arguments\n");
-        exit(EXIT_FAILURE);
+        displayUsage(argv[0]);
     }
     
     /* Verifies number of threads */
@@ -112,7 +116,7 @@ int applyCommand(char * command) {
                 printf("Move: %s To: %s failed.\n", name, thirdArg);
             break;
         case 'p':
-            printf("Print Tecnico FS Tree\n");
+            printf("Print Tecnico FS Tree on file: %s\n", name);
             /* Opens output file. */
             FILE * outputFile;
             if (!(outputFile = fopen(name, "w"))) {
@@ -120,6 +124,7 @@ int applyCommand(char * command) {
                 exit(EXIT_FAILURE);
             }
             commandResult = printOperations(outputFile);
+            fclose(outputFile);
             break;
         default:{ /* error. */
             fprintf(stderr, "Error: command to apply\n");
@@ -227,9 +232,10 @@ int main(int argc, char* argv[]) {;
     /* Initializes the server's socket. */
     socketInit();
 
+    /* Initializes and waits for the threads */
     parallelization();
 
-    /* Fechar e apagar o nome do socket, apesar deste programa nunca chegar a este ponto */
+    /* Closes the socket (program never reaches this point) */
     close(sockfd);
     unlink(socketPath);
     free(socketPath);
